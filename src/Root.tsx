@@ -1,6 +1,7 @@
 import React from 'react';
 import { Composition } from 'remotion';
 import { VIDEO } from './config/video';
+import { CelSpider } from './styletest/CelSpider';
 import { Trailer, TrailerProps } from './Trailer';
 
 export const RemotionRoot: React.FC = () => (
@@ -23,5 +24,7 @@ export const RemotionRoot: React.FC = () => (
       height={VIDEO.height}
       defaultProps={{ withMusic: false }}
     />
+    {/* 風格測試（單張靜態圖） */}
+    <Composition id="StyleTestCel" component={CelSpider} durationInFrames={1} fps={VIDEO.fps} width={VIDEO.width} height={VIDEO.height} />
   </>
 );
