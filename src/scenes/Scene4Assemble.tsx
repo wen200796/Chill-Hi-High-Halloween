@@ -1,6 +1,6 @@
 import React from 'react';
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame } from 'remotion';
-import { Figure } from '../components/Figure';
+import { CharacterVisual, characterGeometry } from '../components/CharacterVisual';
 import { Castle, Clouds, Embers, Fog, Moon, Stars } from '../components/Night';
 import { Camera, Flash, Subtitle, Vignette } from '../components/Overlays';
 import { ASSEMBLY_FORMATION, getCharacter } from '../config/characters';
@@ -63,7 +63,7 @@ export const Scene4Assemble: React.FC = () => {
             const c = getCharacter(pos.id);
             const p = progress(frame, sec(pos.delay), sec(pos.delay) + 12, Easing.out(Easing.cubic));
             const h = 980 * pos.scale;
-            const w = (h * 520) / 1060;
+            const w = h * characterGeometry(c).aspect;
             const baseY = pos.baseY;
             return (
               <div
@@ -78,9 +78,9 @@ export const Scene4Assemble: React.FC = () => {
                   filter: pos.z < 1 ? 'brightness(0.8)' : undefined,
                 }}
               >
-                <Figure
+                <CharacterVisual
                   uid={`a-${c.id}`}
-                  archetype={c.archetype}
+                  c={c}
                   t={t + pos.z}
                   rimLeft={COLORS.violet}
                   rimRight={COLORS.orange}

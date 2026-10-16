@@ -1,6 +1,6 @@
 import React from 'react';
 import { AbsoluteFill, Easing, Img, interpolate, Sequence, staticFile, useCurrentFrame } from 'remotion';
-import { Figure } from '../components/Figure';
+import { CharacterVisual, characterGeometry } from '../components/CharacterVisual';
 import { Embers } from '../components/Night';
 import { Camera, Flash, Subtitle, Vignette } from '../components/Overlays';
 import { Character, getCharacter } from '../config/characters';
@@ -22,11 +22,10 @@ const RosterShot: React.FC<{ c: Character; index: number; len: number }> = ({ c,
   const push = interpolate(frame, [0, len], [1.0, 1.13], { ...clamp, easing: Easing.out(Easing.quad) });
   const slideIn = interpolate(frame, [0, 5], [c.slant * 120, 0], { ...clamp, easing: Easing.out(Easing.cubic) });
   const sh = shake(frame, 0, 6, 22, index + 3);
-  // 剪影 viewBox：-60 -40 520 1060 → 頭部中心 (200, 140)
-  const k = f.h / 1060;
-  const w = (f.h * 520) / 1060;
-  const left = 540 - (200 + 60) * k;
-  const top = f.headY - (140 + 40) * k;
+  const g = characterGeometry(c);
+  const w = f.h * g.aspect;
+  const left = 540 - g.headX * w;
+  const top = f.headY - g.headY * f.h;
   const streak = interpolate(frame, [0, len], [-500, 900], clamp);
 
   return (
@@ -83,9 +82,9 @@ const RosterShot: React.FC<{ c: Character; index: number; len: number }> = ({ c,
               transformOrigin: '50% 100%',
             }}
           >
-            <Figure
+            <CharacterVisual
               uid={`r-${c.id}`}
-              archetype={c.archetype}
+              c={c}
               t={t}
               rimRight={c.accent}
               rimLeft="#ffffff"

@@ -7,7 +7,8 @@
     "audio": "python3 scripts/generate_audio.py",
     "studio": "remotion studio src/index.ts",
     "render": "node scripts/render.mjs",
-    "check": "node scripts/check.mjs"
+    "check": "node scripts/check.mjs",
+    "art": "python3 scripts/prepare_art.py"
   },
   "dependencies": {
     "@fontsource/noto-sans-tc": "^5.3.1",

@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { AbsoluteFill, Easing, interpolate, random, useCurrentFrame } from 'remotion';
-import { Figure } from '../components/Figure';
+import { CharacterVisual, characterGeometry } from '../components/CharacterVisual';
 import { Embers, Fog } from '../components/Night';
 import { Camera, Flash, Subtitle, Vignette } from '../components/Overlays';
 import { getCharacter } from '../config/characters';
@@ -145,7 +145,7 @@ export const Scene2Portal: React.FC = () => {
           const off = i - (n - 1) / 2;
           const depth = 1 - Math.abs(off) * 0.06;
           const h = 470 * depth;
-          const w = h * 0.52;
+          const w = h * characterGeometry(c).aspect;
           return (
             <div
               key={c.id}
@@ -158,9 +158,10 @@ export const Scene2Portal: React.FC = () => {
                 zIndex: 10 - Math.abs(off),
               }}
             >
-              <Figure
+              <CharacterVisual
                 uid={`p-${c.id}`}
-                archetype={c.archetype}
+                c={c}
+                mode="silhouette"
                 t={t + i}
                 rimLeft="#d38bff"
                 rimRight="#ffffff"
