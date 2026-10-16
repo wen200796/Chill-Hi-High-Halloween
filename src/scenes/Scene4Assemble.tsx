@@ -2,7 +2,8 @@ import React from 'react';
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame } from 'remotion';
 import { CharacterVisual, characterGeometry } from '../components/CharacterVisual';
 import { Castle, Clouds, Embers, Fog, Moon, Stars } from '../components/Night';
-import { Camera, Flash, Subtitle, Vignette } from '../components/Overlays';
+import { CaptionBox, ComicTitle, Halftone } from '../components/Comic';
+import { Camera, Flash, Vignette } from '../components/Overlays';
 import { ASSEMBLY_FORMATION, getCharacter } from '../config/characters';
 import { SUBTITLES } from '../config/subtitles';
 import { COLORS } from '../config/theme';
@@ -96,28 +97,25 @@ export const Scene4Assemble: React.FC = () => {
         <Embers frame={frame} count={70} seed="aemb" speed={1.3} />
       </Camera>
       <Vignette strength={0.65} />
-      {SUBTITLES.assemble.map((s) => (
-        <Subtitle
+      <Halftone id="s4h" color="#1a0030" size={12} opacity={0.16} />
+      {SUBTITLES.assemble.map((s, i) => (
+        <CaptionBox
           key={s.text}
           text={s.text}
-          opacity={fadeInOut(frame, sec(s.from), sec(s.from) + 4, sec(s.to) - 3, sec(s.to))}
-          enter={progress(frame, sec(s.from), sec(s.from) + 10, Easing.out(Easing.cubic))}
+          opacity={fadeInOut(frame, sec(s.from), sec(s.from) + 3, sec(s.to) - 2, sec(s.to))}
+          enter={progress(frame, sec(s.from), sec(s.from) + 6, Easing.out(Easing.back(1.8)))}
           y={1500}
-          size={74}
-          glow="rgba(255,140,60,0.6)"
+          size={68}
+          rotate={i % 2 ? 2 : -2}
         />
       ))}
-      {/* 核心主題：大字、金色、清楚易讀 */}
-      <Subtitle
+      {/* 核心主題：漫畫標題字，大且清楚 */}
+      <ComicTitle
         text={SUBTITLES.theme.text}
-        opacity={interpolate(frame, [themeAt, themeAt + 3], [0, 1], clamp)}
-        enter={progress(frame, themeAt, themeAt + 8, Easing.out(Easing.cubic))}
+        opacity={interpolate(frame, [themeAt, themeAt + 2], [0, 1], clamp)}
+        scale={interpolate(frame, [themeAt, themeAt + 5, len], [1.5, 1.0, 0.97], { ...clamp, easing: Easing.out(Easing.back(1.6)) })}
         y={1480}
         size={88}
-        color={COLORS.warmGold}
-        glow="rgba(255,150,40,0.85)"
-        letterSpacing={0.03}
-        style={{ transform: `scale(${interpolate(frame, [themeAt, len], [1.08, 1.0], clamp)})` }}
       />
       <Flash opacity={interpolate(frame, [themeAt - 1, themeAt, themeAt + 4], [0, 0.55, 0], clamp)} color="#ffd9a0" />
       <Flash opacity={interpolate(frame, [0, 3], [0.8, 0], clamp)} />

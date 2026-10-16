@@ -10,8 +10,10 @@ import { browserExecutable, bundleProject, ROOT } from './common.mjs';
 
 const OUT = path.join(ROOT, 'output');
 mkdirSync(OUT, { recursive: true });
-const main = path.join(OUT, 'chill_hi_high_halloween_trailer.mp4');
-const noMusic = path.join(OUT, 'chill_hi_high_halloween_trailer_no_music.mp4');
+// 版本後綴：V2（漫畫風）預設輸出 *_v2 檔名，可用 OUTPUT_SUFFIX 覆寫（例如 OUTPUT_SUFFIX= 代表不加後綴）
+const SUFFIX = process.env.OUTPUT_SUFFIX ?? '_v2';
+const main = path.join(OUT, `chill_hi_high_halloween_trailer${SUFFIX}.mp4`);
+const noMusic = path.join(OUT, `chill_hi_high_halloween_trailer${SUFFIX}_no_music.mp4`);
 
 console.log('1/4 合成音樂與音效…');
 execFileSync('python3', [path.join(ROOT, 'scripts', 'generate_audio.py')], { stdio: 'inherit' });
@@ -50,5 +52,5 @@ execFileSync('ffmpeg', [
   '-y', '-loglevel', 'error', '-i', main, '-i', path.join(ROOT, 'public', 'audio', 'trailer_sfx.wav'),
   '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-shortest', '-movflags', '+faststart', noMusic,
 ]);
-execFileSync('python3', [path.join(ROOT, 'scripts', 'storyboard_preview.py'), main, path.join(OUT, 'storyboard_preview.png')], { stdio: 'inherit' });
+execFileSync('python3', [path.join(ROOT, 'scripts', 'storyboard_preview.py'), main, path.join(OUT, `storyboard_preview${SUFFIX}.png`)], { stdio: 'inherit' });
 console.log('完成：', path.relative(ROOT, main));

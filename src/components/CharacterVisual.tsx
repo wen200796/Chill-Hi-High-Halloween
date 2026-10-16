@@ -1,7 +1,9 @@
 import React from 'react';
 import { Img, staticFile } from 'remotion';
 import { Character } from '../config/characters';
+import { ART_STYLE } from '../config/theme';
 import { Figure } from './Figure';
+import { FigureComic } from './FigureComic';
 
 /** 插圖畫布比例（scripts/prepare_art.py 輸出 1000×1500） */
 const ART_ASPECT = 1000 / 1500;
@@ -41,6 +43,9 @@ export const CharacterVisual: React.FC<Props> = ({
   detail = 1,
   style,
 }) => {
+  if (!c.art && ART_STYLE === 'comic' && mode === 'lit') {
+    return <FigureComic uid={uid} archetype={c.archetype} t={t} rimLeft={rimLeft} rimRight={rimRight} glow={glow} glowStrength={glowStrength} style={style} />;
+  }
   if (!c.art) {
     return (
       <Figure

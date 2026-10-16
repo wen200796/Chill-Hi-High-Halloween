@@ -23,3 +23,9 @@ export const FONTS = {
   /** 一般字幕與活動資訊：思源黑體（Noto Sans TC） */
   sans: '"Noto Sans TC", sans-serif',
 } as const;
+
+/**
+ * 角色畫風：'comic' = 美式漫畫風（V2），'silhouette' = 剪影（V1）。
+ * 有提供角色插圖（art）時一律優先使用插圖。
+ */
+export const ART_STYLE: 'comic' | 'silhouette' = 'comic';

@@ -1,6 +1,8 @@
 import React, { useMemo } from 'react';
 import { AbsoluteFill, random } from 'remotion';
+import { ART_STYLE } from '../config/theme';
 import { Figure } from './Figure';
+import { FigureComic } from './FigureComic';
 
 /**
  * 室內演講舞台：布幕、木地板、聚光燈、單一麥克風。
@@ -117,17 +119,31 @@ export const Stage: React.FC<{
             opacity: person.opacity ?? 1,
           }}
         >
-          <Figure
-            uid="everyday"
-            archetype="everyday"
-            walk={person.walk}
-            rimRight={rgb(0.25 + 0.6 * light)}
-            rimLeft={rgb(0.15 + 0.45 * light)}
-            glow={rgb(1)}
-            glowStrength={0.35 * light}
-            fill="#0d0a10"
-            style={{ width: '100%', height: '100%' }}
-          />
+          {ART_STYLE === 'comic' ? (
+            <FigureComic
+              uid="everyday"
+              archetype="everyday"
+              walk={person.walk}
+              rimRight={rgb(1)}
+              rimLeft={rgb(0.6)}
+              glow={rgb(1)}
+              glowStrength={0.4 * light}
+              light={0.25 + 0.75 * light}
+              style={{ width: '100%', height: '100%' }}
+            />
+          ) : (
+            <Figure
+              uid="everyday"
+              archetype="everyday"
+              walk={person.walk}
+              rimRight={rgb(0.25 + 0.6 * light)}
+              rimLeft={rgb(0.15 + 0.45 * light)}
+              glow={rgb(1)}
+              glowStrength={0.35 * light}
+              fill="#0d0a10"
+              style={{ width: '100%', height: '100%' }}
+            />
+          )}
         </div>
       ) : null}
     </AbsoluteFill>

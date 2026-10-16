@@ -2,7 +2,8 @@ import React, { useMemo } from 'react';
 import { AbsoluteFill, Easing, interpolate, random, useCurrentFrame } from 'remotion';
 import { CharacterVisual, characterGeometry } from '../components/CharacterVisual';
 import { Embers, Fog } from '../components/Night';
-import { Camera, Flash, Subtitle, Vignette } from '../components/Overlays';
+import { CaptionBox, Halftone, SfxWord } from '../components/Comic';
+import { Camera, Flash, Vignette } from '../components/Overlays';
 import { getCharacter } from '../config/characters';
 import { SUBTITLES } from '../config/subtitles';
 import { ROSTER, SCENES, sec } from '../config/video';
@@ -177,7 +178,9 @@ export const Scene2Portal: React.FC = () => {
         <Embers frame={frame} count={40} seed="pemb" colors={['#e6b8ff', '#b76bff', '#ffffff']} speed={1.6} />
       </Camera>
       <Vignette strength={0.7} />
-      <Subtitle text={sub.text} opacity={subOpacity} enter={enter} y={1500} size={76} glow="rgba(200,120,255,0.8)" />
+      <Halftone id="s2h" color="#2a0050" size={12} opacity={0.2} />
+      <SfxWord text="ZZZAAP!" x={540} y={250} size={120} rotate={-6} pop={interpolate(frame, [2, 7], [0, 1], clamp)} fill="#f1d1ff" opacity={interpolate(frame, [len - 8, len - 2], [1, 0], clamp)} />
+      <CaptionBox text={sub.text} opacity={subOpacity} enter={enter} y={1520} size={64} rotate={2} />
       <Flash opacity={interpolate(frame, [0, 4], [0.7, 0], clamp)} color="#e7d4ff" />
       <Flash opacity={interpolate(frame, [len - 4, len], [0, 1], clamp)} />
     </AbsoluteFill>

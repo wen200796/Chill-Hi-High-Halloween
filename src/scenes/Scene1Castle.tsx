@@ -1,7 +1,8 @@
 import React from 'react';
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame } from 'remotion';
 import { Bats, Castle, Clouds, DeadTree, Fog, Lightning, Moon, Sky, Stars } from '../components/Night';
-import { Camera, Flash, Subtitle, Vignette } from '../components/Overlays';
+import { CaptionBox, Halftone } from '../components/Comic';
+import { Camera, Flash, Vignette } from '../components/Overlays';
 import { SUBTITLES } from '../config/subtitles';
 import { CUES, SCENES, sec } from '../config/video';
 import { clamp, fadeInOut, progress } from '../util';
@@ -37,7 +38,9 @@ export const Scene1Castle: React.FC = () => {
         <Fog frame={frame} top={1360} opacity={0.6} />
       </Camera>
       <Vignette strength={0.8} />
-      <Subtitle text={sub.text} opacity={subOpacity} enter={enter} y={1290} size={78} />
+      <Halftone id="s1h" color="#000" size={12} opacity={0.18} />
+      {/* 漫畫旁白框 */}
+      <CaptionBox text={sub.text} opacity={subOpacity} enter={enter} y={1330} size={64} rotate={-2} />
       <AbsoluteFill style={{ background: '#000', opacity: fromDark }} />
       <Flash opacity={interpolate(frame, [len - 3, len], [0, 0.7], clamp)} color="#d9c4ff" />
     </AbsoluteFill>

@@ -1,7 +1,8 @@
 import React from 'react';
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame } from 'remotion';
 import { Bats, Embers } from '../components/Night';
-import { Camera, Flash, Logo, Subtitle, Vignette } from '../components/Overlays';
+import { CaptionBox, Halftone, INK } from '../components/Comic';
+import { Camera, Flash, Logo, Vignette } from '../components/Overlays';
 import { Stage } from '../components/Stage';
 import { BRAND, EVENT } from '../config/event';
 import { SUBTITLES } from '../config/subtitles';
@@ -143,22 +144,14 @@ export const Scene7Finale: React.FC = () => {
       <AbsoluteFill style={{ opacity: panel }}>
         <Bats frame={frame + 40} count={5} seed="fb" color="#12051c" />
         <Embers frame={frame} count={40} seed="femb" area={{ x: 0, y: 900, w: 1080, h: 1020 }} speed={0.7} />
+        <Halftone id="s7h" color="#ff8a1f" size={16} opacity={0.12} blend="screen" />
         <Pumpkin x={130} y={1770} size={230} frame={frame} seed={1} />
         <Pumpkin x={960} y={1790} size={190} frame={frame} seed={2} flip />
         <Pumpkin x={300} y={1840} size={120} frame={frame} seed={3} />
       </AbsoluteFill>
 
       {/* 主題字幕（全段保留在畫面上方） */}
-      <Subtitle
-        text={SUBTITLES.finale.theme}
-        opacity={themeIn}
-        enter={themeIn}
-        y={236}
-        size={72}
-        color={COLORS.warmGold}
-        glow="rgba(255,160,60,0.7)"
-        letterSpacing={0.04}
-      />
+      <CaptionBox text={SUBTITLES.finale.theme} opacity={themeIn} enter={themeIn} y={220} size={62} rotate={-2} />
 
       {/* 品牌 */}
       <div
@@ -181,15 +174,15 @@ export const Scene7Finale: React.FC = () => {
           </div>
           <div
             style={{
-              fontFamily: FONTS.cinematic,
+              fontFamily: FONTS.sans,
               fontWeight: 900,
-              fontSize: 92,
+              fontSize: 96,
               lineHeight: 1.05,
               letterSpacing: '0.02em',
-              background: 'linear-gradient(180deg, #ffd36b 0%, #ff8a1f 55%, #e2470e 100%)',
-              WebkitBackgroundClip: 'text',
-              color: 'transparent',
-              filter: 'drop-shadow(0 3px 10px rgba(0,0,0,0.7))',
+              color: '#ff8a1f',
+              WebkitTextStroke: `9px ${INK}`,
+              paintOrder: 'stroke fill',
+              textShadow: `6px 6px 0 ${INK}`,
             }}
           >
             {BRAND.titleLines.halloween.toUpperCase()}

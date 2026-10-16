@@ -32,7 +32,7 @@ type FigureProps = {
 const DARK = COLORS.silhouette;
 
 /** Catmull-Rom 曲線 → 平滑封閉路徑 */
-const smoothPath = (pts: [number, number][]) => {
+export const smoothPath = (pts: [number, number][]) => {
   const n = pts.length;
   let d = `M${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
   for (let i = 0; i < n; i++) {
@@ -48,7 +48,7 @@ const smoothPath = (pts: [number, number][]) => {
 };
 
 /** 錐形肢體（兩端圓角） */
-const Limb: React.FC<{ a: [number, number]; b: [number, number]; r1: number; r2: number }> = ({ a, b, r1, r2 }) => {
+export const Limb: React.FC<{ a: [number, number]; b: [number, number]; r1: number; r2: number }> = ({ a, b, r1, r2 }) => {
   const dx = b[0] - a[0];
   const dy = b[1] - a[1];
   const l = Math.hypot(dx, dy) || 1;
@@ -63,8 +63,8 @@ const Limb: React.FC<{ a: [number, number]; b: [number, number]; r1: number; r2:
   );
 };
 
-type Pt = [number, number];
-const Arm: React.FC<{ s: Pt; e: Pt; w: Pt }> = ({ s, e, w }) => (
+export type Pt = [number, number];
+export const Arm: React.FC<{ s: Pt; e: Pt; w: Pt }> = ({ s, e, w }) => (
   <>
     <Limb a={s} b={e} r1={21} r2={15} />
     <Limb a={e} b={w} r1={15} r2={11} />
@@ -80,7 +80,7 @@ const LEFT_HALF: Pt[] = [
 ];
 
 /** 軀幹與雙腿的外框路徑（也用於裁切戰衣顏色） */
-const bodyPath = (legSpread = 0, slim = 0) => {
+export const bodyPath = (legSpread = 0, slim = 0) => {
   const k = 1 - slim / 110;
   const left = LEFT_HALF.map(([x, y]): Pt => {
     let nx = 200 + (x - 200) * (y < 560 ? k : 1);
@@ -92,13 +92,13 @@ const bodyPath = (legSpread = 0, slim = 0) => {
 };
 
 /** 各角色的體型參數 */
-const BODY: Record<string, { legSpread: number; slim: number }> = {
+export const BODY: Record<string, { legSpread: number; slim: number }> = {
   spider: { legSpread: 30, slim: 8 },
   plumber: { legSpread: 18, slim: -16 },
   scoutSoldier: { legSpread: 24, slim: 8 },
 };
 
-const BaseBody: React.FC<{ legSpread?: number; slim?: number; armRaisedRight?: boolean; armOutLeft?: boolean }> = ({
+export const BaseBody: React.FC<{ legSpread?: number; slim?: number; armRaisedRight?: boolean; armOutLeft?: boolean }> = ({
   legSpread = 0,
   slim = 0,
   armRaisedRight = false,
@@ -117,7 +117,7 @@ const BaseBody: React.FC<{ legSpread?: number; slim?: number; armRaisedRight?: b
 };
 
 /** 頭部：頭頂 + 下顎 + 耳朵 */
-const Head: React.FC<{ rx?: number; ry?: number }> = ({ rx = 46 }) => {
+export const Head: React.FC<{ rx?: number; ry?: number }> = ({ rx = 46 }) => {
   const w = rx;
   return (
     <g>
@@ -129,7 +129,7 @@ const Head: React.FC<{ rx?: number; ry?: number }> = ({ rx = 46 }) => {
 };
 
 /** 剪影形狀（全部同一深色，讓濾鏡能產生乾淨的輪廓光） */
-const Shape: React.FC<{ a: FigureProps['archetype']; t: number; walk: number }> = ({ a, t, walk }) => {
+export const Shape: React.FC<{ a: FigureProps['archetype']; t: number; walk: number }> = ({ a, t, walk }) => {
   const sway = Math.sin(t * 5) * 1;
   switch (a) {
     case 'shield':

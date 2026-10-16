@@ -42,6 +42,8 @@ export type Character = {
   shot: 'closeup' | 'bust' | 'low-angle';
   /** 斜切面板方向 */
   slant: -1 | 1;
+  /** 漫畫音效字（V2 漫畫風角色登場時顯示） */
+  sfx?: string;
   /** 選填：實際照片（public/ 底下的相對路徑） */
   photo?: string;
   /** 自動帶入：角色插圖（由 npm run art 產生） */
@@ -52,15 +54,15 @@ export type Character = {
 
 /** 角色資料。登場順序由 timeline.json → roster 決定 */
 const BASE_CHARACTERS: Character[] = [
-  { id: 'captain', label: '盾牌英雄（美國隊長）', archetype: 'shield', group: 'hero', accent: '#4f8dff', accent2: '#c81d3a', shot: 'bust', slant: 1 },
-  { id: 'spider', label: '蛛網英雄（蜘蛛人）', archetype: 'spider', group: 'hero', accent: '#ff3045', accent2: '#1b3fae', shot: 'closeup', slant: -1 },
-  { id: 'knight', label: '黑暗騎士（蝙蝠俠）', archetype: 'knight', group: 'hero', accent: '#9fc4ff', accent2: '#1a2340', shot: 'bust', slant: 1 },
-  { id: 'mario', label: '紅帽水管工（超級瑪利歐）', archetype: 'plumber', group: 'hero', accent: '#ff3b3b', accent2: '#1d4fd8', shot: 'bust', slant: -1 },
-  { id: 'mikasa', label: '紅圍巾戰士（米卡莎）', archetype: 'scoutSoldier', group: 'hero', accent: '#ff4a4a', accent2: '#2f5d3a', shot: 'low-angle', slant: 1 },
-  { id: 'joker', label: '小丑反派（Joker）', archetype: 'joker', group: 'villain', accent: '#62ff7a', accent2: '#6a1fa8', shot: 'closeup', slant: -1 },
-  { id: 'sailor', label: '魔法少女（美少女戰士）', archetype: 'magicalGirl', group: 'mage', accent: '#ff7fd0', accent2: '#ffd34a', shot: 'bust', slant: 1 },
-  { id: 'student', label: '史萊哲林學院魔法師（哈利波特）', archetype: 'wizardStudent', group: 'mage', accent: '#3dffa8', accent2: '#c9d3d6', shot: 'closeup', slant: -1 },
-  { id: 'elder', label: '老巫師（鄧不利多）', archetype: 'oldWizard', group: 'mage', accent: '#ffd36b', accent2: '#5b3bbf', shot: 'low-angle', slant: 1 },
+  { id: 'captain', label: '盾牌英雄（美國隊長）', archetype: 'shield', group: 'hero', accent: '#4f8dff', accent2: '#c81d3a', shot: 'bust', slant: 1, sfx: 'WHAM!' },
+  { id: 'spider', label: '蛛網英雄（蜘蛛人）', archetype: 'spider', group: 'hero', accent: '#ff3045', accent2: '#1b3fae', shot: 'closeup', slant: -1, sfx: 'THWIP!' },
+  { id: 'knight', label: '黑暗騎士（蝙蝠俠）', archetype: 'knight', group: 'hero', accent: '#9fc4ff', accent2: '#1a2340', shot: 'bust', slant: 1, sfx: 'BAM!' },
+  { id: 'mario', label: '紅帽水管工（超級瑪利歐）', archetype: 'plumber', group: 'hero', accent: '#ff3b3b', accent2: '#1d4fd8', shot: 'bust', slant: -1, sfx: 'BOING!' },
+  { id: 'mikasa', label: '紅圍巾戰士（米卡莎）', archetype: 'scoutSoldier', group: 'hero', accent: '#ff4a4a', accent2: '#2f5d3a', shot: 'low-angle', slant: 1, sfx: 'SLASH!' },
+  { id: 'joker', label: '小丑反派（Joker）', archetype: 'joker', group: 'villain', accent: '#62ff7a', accent2: '#6a1fa8', shot: 'closeup', slant: -1, sfx: 'HA HA HA!' },
+  { id: 'sailor', label: '魔法少女（美少女戰士）', archetype: 'magicalGirl', group: 'mage', accent: '#ff7fd0', accent2: '#ffd34a', shot: 'bust', slant: 1, sfx: 'SPARKLE!' },
+  { id: 'student', label: '史萊哲林學院魔法師（哈利波特）', archetype: 'wizardStudent', group: 'mage', accent: '#3dffa8', accent2: '#c9d3d6', shot: 'closeup', slant: -1, sfx: 'ZAP!' },
+  { id: 'elder', label: '老巫師（鄧不利多）', archetype: 'oldWizard', group: 'mage', accent: '#ffd36b', accent2: '#5b3bbf', shot: 'low-angle', slant: 1, sfx: 'FLASH!' },
 ];
 
 const ART_MAP = ART as Record<string, { src: string; head: { x: number; y: number } }>;

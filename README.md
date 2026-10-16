@@ -5,14 +5,28 @@
 以 Remotion（React）製作的 15 秒、1080 × 1920、30 FPS 萬聖節活動預告片。
 前 10 秒是史詩級英雄電影預告，第 9.8 秒音樂突然停止，畫面切換到 Toastmasters 演講舞台——真正的挑戰是「即席演講！」。
 
-## 成品
+## 版本
+
+| 分支 | 風格 | 成品 |
+|---|---|---|
+| `V1` | 電影感剪影風格 | `output/chill_hi_high_halloween_trailer.mp4` |
+| `V2`（本分支） | 美式漫畫風：彩色角色、墨線、網點、黑影、集中線、漫畫格、黃色說明框、音效字 | `output/chill_hi_high_halloween_trailer_v2.mp4` |
+
+切換畫風：`src/config/theme.ts` 的 `ART_STYLE`（`'comic'` 或 `'silhouette'`）。
+V2 刻意保留「音樂停止 → 真實舞台」那一段不做漫畫化，讓反轉更明顯；片尾再回到漫畫風。
+
+## 成品（V2）
 
 | 檔案 | 說明 |
 |---|---|
-| `output/chill_hi_high_halloween_trailer.mp4` | 正式版（音樂 + 音效），H.264 / AAC |
-| `output/chill_hi_high_halloween_trailer_no_music.mp4` | 無音樂版（只保留音效） |
-| `output/storyboard_preview.png` | 0、2、4、7、9、10.5、12、13.5、14.5 秒的關鍵畫面 |
+| `output/chill_hi_high_halloween_trailer_v2.mp4` | 正式版（音樂 + 音效），H.264 / AAC |
+| `output/chill_hi_high_halloween_trailer_v2_no_music.mp4` | 無音樂版（只保留音效） |
+| `output/storyboard_preview_v2.png` | 0、2、4、7、9、10.5、12、13.5、14.5 秒的關鍵畫面 |
+| `output/chill_hi_high_halloween_trailer.mp4` 等 | V1 成品（保留供比較） |
 | `docs/storyboard_mapping.md` | 參考圖 → 影片場景的分鏡對照表 |
+
+輸出檔名後綴由 `OUTPUT_SUFFIX` 控制（預設 `_v2`），例如 `OUTPUT_SUFFIX=_v3 npm run render`。
+每個角色的漫畫音效字（WHAM!、THWIP!…）在 `src/config/characters.ts` 的 `sfx` 欄位。
 
 ## 環境需求
 
