@@ -1,0 +1,26 @@
+{
+  "name": "chill-hi-high-halloween-trailer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Chill Hi High Halloween Toastmasters 15s vertical trailer (Remotion)",
+  "scripts": {
+    "audio": "python3 scripts/generate_audio.py",
+    "studio": "remotion studio src/index.ts",
+    "render": "node scripts/render.mjs",
+    "check": "node scripts/check.mjs"
+  },
+  "dependencies": {
+    "@fontsource/noto-sans-tc": "^5.3.1",
+    "@fontsource/noto-serif-tc": "^5.3.1",
+    "@remotion/bundler": "^4.0.535",
+    "@remotion/cli": "^4.0.535",
+    "@remotion/renderer": "^4.0.535",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "^4.0.535"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.31",
+    "typescript": "^7.0.2"
+  }
+}

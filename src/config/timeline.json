@@ -1,0 +1,27 @@
+{
+  "_comment": "所有時間單位為秒。影片畫面（Remotion）與音樂音效（scripts/generate_audio.py）共用這份時間軸。",
+  "fps": 30,
+  "width": 1080,
+  "height": 1920,
+  "durationSec": 15,
+  "scenes": {
+    "castle":    { "start": 0.0,  "end": 1.5 },
+    "portal":    { "start": 1.5,  "end": 3.0 },
+    "roster":    { "start": 3.0,  "end": 6.5 },
+    "assemble":  { "start": 6.5,  "end": 9.8 },
+    "freeze":    { "start": 9.8,  "end": 10.0 },
+    "stage":     { "start": 10.0, "end": 10.8 },
+    "challenge": { "start": 10.8, "end": 12.8 },
+    "finale":    { "start": 12.8, "end": 15.0 }
+  },
+  "cues": {
+    "lightning": 0.8,
+    "musicStop": 9.8,
+    "spotlightOn": 10.0,
+    "cardSlam": 11.55,
+    "finaleSpotlight": 13.15,
+    "endCardStart": 13.3,
+    "endCardComplete": 13.9
+  },
+  "roster": ["captain", "spider", "knight", "mario", "mikasa", "joker", "sailor", "student", "elder"]
+}
