@@ -32,8 +32,8 @@ CAPE_AT = 8.05
 SMILE_GLITCH_AT = 15.85
 CLASH_AT = scene.IMPACT_AT
 INFO_AT = scene.INFO_AT
-CARD_AT = INFO_AT + 0.15          # info card lands (matches scene.overlays)
-PRIZE_AT = INFO_AT + 1.5          # first of the four bouncing prize characters
+CARD_AT = INFO_AT + 0.10          # info card lands (matches scene.overlays)
+PRIZE_AT = INFO_AT + 1.1          # first of the four bouncing prize characters
 ENDING_AT = DUR - 0.85            # closing button under the info card
 FADE_END = DUR - 0.02
 TARGET_LUFS = -16.0
@@ -307,13 +307,13 @@ def sfx():
     thud = sweep_sine(140, 60, n, 20) * adsr(n, 0.002, 0.06)
     place(bus, slap * 0.7 + thud, CARD_AT, gain=db(-16))
     # Club ribbon: a lighter slap.
-    place(bus, slap * 0.6, CARD_AT + 0.2, 0.3, db(-23))
+    place(bus, slap * 0.6, CARD_AT + 0.15, 0.3, db(-23))
     # "神秘小禮": four bubbly pops climbing D minor, one per character.
     for i, m in enumerate((74, 77, 81, 86)):
         n = int(0.14 * SR)
         f0 = midi(m)
         pop = np.sin(2 * np.pi * np.cumsum(f0 * (1 + 0.6 * np.exp(-t_axis(n) * 60))) / SR) * adsr(n, 0.002, 0.04)
-        place(bus, pop, PRIZE_AT + i * 0.14, -0.45 + 0.3 * i, db(-24))
+        place(bus, pop, PRIZE_AT + i * 0.12, -0.45 + 0.3 * i, db(-24))
     return bus
 
 
