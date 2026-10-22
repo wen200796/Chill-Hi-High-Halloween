@@ -356,15 +356,15 @@ def to_frame(bx, by, cx, cy, vh):
 def s1_hall(c, t, lt, u):
     # The green Slytherin bay, full height; a slow push toward Harry standing alone on the floor.
     k = ease(u)
-    cx, cy, vh = lerp(270, 245, k), lerp(470, 600, k), lerp(941, 700, k)
+    cx, cy, vh = lerp(270, 250, k), lerp(470, 610, k), lerp(941, 760, k)
     place_bg(c, A.bay_green, cx, cy, vh, sigma=lerp(0.0, 0.6, k), mult=0.9)
     beams(c, t, W * 0.3, EMERALD * 0.8 + SILVER * 0.2, 0.18, seed=2)
     fx, fy = to_frame(245, 905, cx, cy, vh)
     lay = sway(A.char("harry_1", HARRY_RIM, HARRY_KEY, GREEN_GRADE), t, 2.5, low_region(0.45, (0.95, 0.1)))
     sh = np.zeros((H, W), np.float32)
-    cv2.ellipse(sh, (int(fx), int(fy)), (int(70 * H / vh), int(9 * H / vh)), 0, 0, 360, 0.6, -1, cv2.LINE_AA)
+    cv2.ellipse(sh, (int(fx), int(fy)), (int(95 * H / vh), int(12 * H / vh)), 0, 0, 360, 0.6, -1, cv2.LINE_AA)
     c *= 1 - cv2.GaussianBlur(sh, (0, 0), 8)[..., None]
-    put(c, lay, (fx, fy), 400 * H / vh, anchor=(0.45, 0.985))
+    put(c, lay, (fx, fy), 560 * H / vh, anchor=(0.45, 0.985))
     glow(c, (fx, fy - 30 * H / vh), 140 * H / vh, EMERALD, 0.22)
     particles(c, t, 1, 80, (0, 0, W, H), EMERALD, rise=16, strength=0.55)
     fog(c, t, EMERALD_DEEP * 0.6 + SILVER * 0.1, 0.35, low=0.6)
@@ -436,29 +436,41 @@ def s4b_dumbledore_eyes(c, t, lt, u):
     return finish(c, t, grade=BLUE_GRADE, floor_dark=0.75)
 
 
-# Standoff in the corridor bay (bay pixels): Harry near camera on the left, Dumbledore further
-# down the hall on the right, the floor sigil between them under the vanishing point.
-H_FEET, D_FEET = (120, 895), (400, 735)
-H_TALL, D_TALL = 420, 265
+# Standoff in the corridor bay. Characters are laid out in frame pixels (big, near the camera:
+# Harry left-front, Dumbledore right and a step further back); the bay behind them is framed
+# separately. Three layouts: NEAR (start of the pull-back), FULL (no card) and CARD (both sink so
+# their heads clear the info card).
 H1_WAND = (0.98, 0.74)   # wand tip, relative to the harry_1 panel
 D1_WAND = (0.55, 0.80)   # wand tip, relative to the dumbledore_1 panel
 H1_ANCHOR, D1_ANCHOR = (0.45, 0.985), (0.5, 0.97)
-MEET = (262, 745)
+LAYOUT = {
+    #        bg view (cx, cy, vh)   Harry feet, height     Dumbledore feet, height
+    "near": ((270, 600, 640), (170, 2060), 1450, (900, 1560), 900),
+    "full": ((270, 540, 760), (185, 1850), 1220, (880, 1500), 800),
+    "card": ((270, 470, 760), (190, 2130), 1160, (880, 1835), 860),
+}
 
 
-def standoff(c, t, view, energy, flash_amt):
+def mix_layout(a, b, k):
+    la, lb = LAYOUT[a], LAYOUT[b]
+
+    def mx(x, y):
+        if isinstance(x, tuple):
+            return tuple(lerp(p, q, k) for p, q in zip(x, y))
+        return lerp(x, y, k)
+    return tuple(mx(x, y) for x, y in zip(la, lb))
+
+
+def standoff(c, t, layout, energy, flash_amt):
+    view, hfeet, hh, dfeet, dh = layout
     cx, cy, vh = view
-    k = H / vh
-    place_bg(c, A.bay_corridor, cx, cy, vh, sigma=0.5, mult=0.88)
+    place_bg(c, A.bay_corridor, cx, cy, vh, sigma=1.2, mult=0.85)
     beams(c, t, W * 0.5, SILVER * 0.5 + MIDNIGHT * 0.3 + EMERALD * 0.2, 0.15, seed=10)
     breathe = 1 + 0.006 * math.sin(t * 1.3)
-    hfeet = to_frame(*H_FEET, cx, cy, vh)
-    dfeet = to_frame(*D_FEET, cx, cy, vh)
-    hh, dh = H_TALL * k * breathe, D_TALL * k * (2 - breathe)
-    for (fx, fy), wdt in ((hfeet, 90), (dfeet, 60)):
-        sh = np.zeros((H, W), np.float32)
-        cv2.ellipse(sh, (int(fx), int(fy)), (int(wdt * k), int(10 * k)), 0, 0, 360, 0.6, -1, cv2.LINE_AA)
-        c *= 1 - cv2.GaussianBlur(sh, (0, 0), 8)[..., None]
+    hh, dh = hh * breathe, dh * (2 - breathe)
+    sh = np.zeros((H, W), np.float32)
+    cv2.ellipse(sh, (int(dfeet[0]), int(dfeet[1])), (int(dh * 0.2), int(dh * 0.025)), 0, 0, 360, 0.6, -1, cv2.LINE_AA)
+    c *= 1 - cv2.GaussianBlur(sh, (0, 0), 8)[..., None]
     dl = sway(A.char("dumbledore_1", DUMB_RIM, DUMB_KEY, BLUE_GRADE), t, 2.0, low_region(0.5, (0.5, 0.12)))
     put(c, dl, dfeet, dh, anchor=D1_ANCHOR)
     glow(c, (dfeet[0], dfeet[1] - dh * 0.5), dh * 0.6, MIDNIGHT * 0.5 + SILVER * 0.2, 0.2 + 0.12 * energy)
@@ -470,17 +482,19 @@ def standoff(c, t, view, energy, flash_amt):
     hy = hfeet[1] + (H1_WAND[1] - H1_ANCHOR[1]) * hh
     dx = dfeet[0] + (D1_WAND[0] - D1_ANCHOR[0]) * pw_d * dh / ph_d
     dy = dfeet[1] + (D1_WAND[1] - D1_ANCHOR[1]) * dh
-    mx, my = to_frame(*MEET, cx, cy, vh)
-    gap = lerp(260, 26, energy) * k
+    # The energies rise from both wand tips and meet in the open air between the two of them.
+    mx, my = (hfeet[0] + dfeet[0]) / 2 + 40, dfeet[1] - 0.48 * dh
+    k = hh / 1260
+    gap = lerp(200, 22, energy) * k
     energy_stream(c, t, (hx, hy), (mx - gap / 2, my + gap * 0.15), EMERALD, (0.85, 1.0, 0.9), energy, 1,
-                  width=7 * k, jitter=16 * k)
+                  width=11 * k, jitter=22 * k)
     energy_stream(c, t, (dx, dy), (mx + gap / 2, my - gap * 0.15), MIDNIGHT * 0.6 + SILVER * 0.4, (1.0, 1.0, 1.0),
-                  energy, 4, width=6 * k, jitter=14 * k)
-    glow(c, (hx, hy), 40 * k, EMERALD, 0.4 + 0.4 * energy)
-    glow(c, (dx, dy), 34 * k, SILVER * 0.6 + MIDNIGHT * 0.4, 0.4 + 0.4 * energy)
+                  energy, 4, width=10 * k, jitter=20 * k)
+    glow(c, (hx, hy), 60 * k, EMERALD, 0.4 + 0.4 * energy)
+    glow(c, (dx, dy), 52 * k, SILVER * 0.6 + MIDNIGHT * 0.4, 0.4 + 0.4 * energy)
     if energy > 0.85:
         crackle = 0.5 + 0.5 * math.sin(t * 17) * math.sin(t * 7.3)
-        glow(c, (mx, my), (22 + 16 * crackle) * k, WHITE, 0.35 + 0.25 * crackle)
+        glow(c, (mx, my), (34 + 24 * crackle) * k, WHITE, 0.35 + 0.25 * crackle)
     particles(c, t, 13, 70, (0, 0, W / 2, H), EMERALD, rise=10, strength=0.5)
     particles(c, t, 14, 70, (W / 2, 0, W, H), SILVER * 0.6 + MIDNIGHT * 0.4, rise=10, strength=0.5)
     fog(c, t, EMERALD_DEEP * 0.3 + MIDNIGHT * 0.25, 0.3, low=0.6)
@@ -489,28 +503,24 @@ def standoff(c, t, view, energy, flash_amt):
     return c
 
 
-STANDOFF_NEAR = (255, 640, 760)   # start of the pull-back
-STANDOFF_WIDE = (270, 470.5, 941)  # full corridor bay
-
-
 def s5_standoff(c, t, lt, u):
-    # Slow pull-back revealing the length of the hall; the two energies reach toward the sigil.
+    # Slow pull-back from close on the two of them; the energies reach toward each other.
     k = ease(u)
-    view = tuple(lerp(a, b, k) for a, b in zip(STANDOFF_NEAR, STANDOFF_WIDE))
-    standoff(c, t, view, k * 0.92, 0.0)
-    return finish(c, t, grade=((0.95, 1.0, 1.04), (0, 0.004, 0.01)))
+    standoff(c, t, mix_layout("near", "full", k), k * 0.92, 0.0)
+    return finish(c, t, grade=((0.95, 1.0, 1.04), (0, 0.004, 0.01)), floor_dark=0.3)
 
 
 def s6_hold(c, t, lt, u):
     # Flash as the energies almost touch, then a 7.9 s held standoff with idle motion (no hard freeze).
-    # When the info card arrives the camera eases back a touch and the hall sinks, opening the
-    # vaulted ceiling for the card while both heads and the meeting point stay clear below it.
+    # When the info card arrives both sink a little so their heads stay clear below it.
     room = ease((t - INFO_AT) / 0.5)
-    vh = lerp(941, 1000, room) - 15 * ease((t - INFO_AT - 0.5) / (DURATION - INFO_AT - 0.5))
-    view = (270, 941 - vh / 2, vh)
-    standoff(c, t, view, 0.92 + 0.08 * ease(lt / 0.4), max(0.0, 1 - lt / 0.5))
+    lay = mix_layout("full", "card", room)
+    push = 1 + 0.03 * ease((t - INFO_AT - 0.5) / (DURATION - INFO_AT - 0.5))
+    lay = (lay[0], lay[1], lay[2] * push, lay[3], lay[4] * push)
+    standoff(c, t, lay, 0.92 + 0.08 * ease(lt / 0.4), max(0.0, 1 - lt / 0.5))
     fade = ease((t - (DURATION - 0.25)) / 0.25)
-    return finish(c, t, grade=((0.95, 1.0, 1.04), (0, 0.004, 0.01)), flash=0.6 * max(0, 1 - lt / 0.12), fade=fade)
+    return finish(c, t, grade=((0.95, 1.0, 1.04), (0, 0.004, 0.01)), flash=0.6 * max(0, 1 - lt / 0.12), fade=fade,
+                  floor_dark=0.3)
 
 
 SHOT_FUNCS = {name: globals()[name] for _, _, name in SHOTS}

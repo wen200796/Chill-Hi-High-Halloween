@@ -3,7 +3,8 @@
 Everything except the two voice files is synthesized here (oscillators, Karplus-Strong plucks,
 formant-filtered "choir", filtered noise, convolution reverb), so the music is original and free
 to use. The style nods to the films' sound world - celesta in 3/4, E minor with chromatic turns,
-strings, wordless choir, harp, timpani, tubular bell - but the melody is newly written and
+a never-ending harp/pizzicato ostinato, airy pads and string harmonics, wordless "ooh" choir,
+a soft heartbeat drum under the standoff, tubular bell - but the melody is newly written and
 does not quote any film theme. The voice files are used unedited (level-matched and placed).
 
 Output: 哈鄧/output/_build/mix.wav (48 kHz stereo) + stems.
@@ -202,65 +203,112 @@ def play_motif(bus, start, gain, octave=0, transpose_end=None, pan=-0.15):
         place(bus, celesta(nn, 1.2 + length * BEAT), start + beat * BEAT, pan + 0.1 * np.sin(beat), gain)
 
 
+def soft_pad(notes, dur, attack=1.2, release=1.2, bright=1400):
+    """Warm, airy pad (sine + filtered triangle) - mysterious rather than menacing."""
+    n = int(dur * SR)
+    t = t_axis(n)
+    x = np.zeros(n)
+    for note in notes:
+        f = midi(note)
+        for det in (-0.003, 0.004):
+            ph = np.cumsum(f * (1 + det) * (1 + 0.002 * np.sin(2 * np.pi * 4.6 * t))) / SR
+            x += 0.6 * np.sin(2 * np.pi * ph) + 0.4 * (2 * np.abs(2 * (ph % 1) - 1) - 1)
+    x = filt(x, "lowpass", bright, 2) / (2 * len(notes))
+    return x * adsr(n, attack, 99, 1.0, release)
+
+
+def harmonics(notes, dur, attack=1.5, release=1.5):
+    """High string harmonics: glassy, quietly shimmering."""
+    n = int(dur * SR)
+    t = t_axis(n)
+    x = sum(np.sin(2 * np.pi * midi(nt) * t * (1 + 0.0025 * np.sin(2 * np.pi * 5.5 * t + k)))
+            for k, nt in enumerate(notes))
+    x *= 0.75 + 0.25 * np.sin(2 * np.pi * 0.7 * t)
+    return x / len(notes) * adsr(n, attack, 99, 1.0, release)
+
+
+def pizz(note, bright=0.35):
+    return pluck(note, 0.5, bright) * adsr(int(0.5 * SR), 0.001, 0.16)
+
+
+# Chord plan (time, length, root-position notes) for the ostinato and pads.
+#            Em                    Cmaj7                       G/B                      Am            C
+PLAN = [(0.6, 2.6, "E3 B3 G4"), (3.2, 3.5, "C3 G3 E4 B4"), (6.7, 2.85, "B2 G3 D4"), (9.55, 1.85, "A2 E3 C4"),
+        (11.4, 1.9, "C3 G3 E4"),
+        # standoff: one chord a bar-half, climbing - Em, C, Am, B, Em, C, Am/F#, B7
+        (13.3, 0.5, "E3 B3 G4"), (13.8, 0.5, "C3 G3 E4"), (14.3, 0.5, "A2 E3 C4"), (14.8, 0.5, "B2 F#3 D#4"),
+        (15.3, 0.45, "E3 B3 G4"), (15.75, 0.45, "C3 G3 E4"), (16.2, 0.45, "F#3 A3 C4"), (16.65, 0.45, "B2 D#4 A4")]
+
+
 def music():
     dry = np.zeros((N, 2))
     t = t_axis(N)
 
-    # Low string drone through the whole piece, swelling and thinning with the story.
-    drone = strings([m("E2"), m("B2")], DUR, attack=1.5, release=0.6, bright=700)
-    lvl = np.interp(t, [0, 3, 6.7, 9.5, 13.3, 16.8, 17.1, 18, 24, 25], [0.8, 1, 0.9, 0.8, 1.1, 1.4, 0.4, 0.8, 0.8, 0])
-    dry += np.stack([drone * lvl, np.roll(drone * lvl, 400)], axis=1) * db(-18)
+    # 1. A quiet low pedal (pure sine, no saw grit) and airy pads: mystery, not menace.
+    ped = np.sin(2 * np.pi * midi(m("E2")) * t) * 0.6 + np.sin(2 * np.pi * midi(m("B2")) * t) * 0.25
+    lvl = np.interp(t, [0, 2, 13.3, 17.0, 17.1, 18, 24, 25], [0, 0.7, 0.8, 1.2, 0.4, 0.6, 0.6, 0])
+    dry += (ped * lvl)[:, None] * db(-26)
+    for at, ln, chord in PLAN[:5]:
+        place(dry, soft_pad([m(n) for n in chord.split()], ln + 0.6, 0.8, 0.7), at - 0.2, 0.0, db(-25))
+    place(dry, harmonics([m("B5"), m("E6")], 6.0, 2.0, 1.5), 0.3, 0.3, db(-36))
+    place(dry, harmonics([m("D6"), m("F#6")], 3.4, 1.0, 1.2), 6.7, -0.3, db(-36))
 
-    # Opening: celesta motif over a soft E minor pad.
-    play_motif(dry, 0.9, db(-17))
-    place(dry, strings([m("E3"), m("G3"), m("B3")], 3.4, 1.2, 0.8), 0.4, -0.2, db(-24))
-    # Harry's line: C major colour under "destiny", choir enters.
-    place(dry, strings([m("C3"), m("E3"), m("G3"), m("B3")], 3.6, 0.8, 0.8), 3.2, 0.2, db(-24))
-    place(dry, choir([m("E4"), m("G4"), m("B4")], 2.4, 0.9, 0.9), 5.1, 0.0, db(-22))
+    # 2. Celesta motif (unchanged melody) - the main mysterious colour.
+    play_motif(dry, 0.9, db(-18))
 
-    # Dumbledore's reveal: harp glissando up, the colour turns to B minor / G.
-    for i, note in enumerate(["E3", "F#3", "G3", "B3", "D4", "E4", "F#4", "G4", "B4", "D5", "E5", "F#5"]):
-        place(dry, pluck(m(note), 2.2, 0.4 + i * 0.04), 6.70 + i * 0.045, -0.6 + i * 0.1, db(-17))
-    place(dry, choir([m("D4"), m("F#4"), m("B4")], 3.0, 1.0, 1.0, vowel=((450, 90), (800, 100), (2830, 160))), 6.9,
-          0.15, db(-21))
-    place(dry, strings([m("G2"), m("D3"), m("B3")], 3.1, 1.0, 0.9), 6.7, 0.0, db(-23))
-    # High string shimmer for the blue side.
-    place(dry, strings([m("B5"), m("F#6")], 2.8, 1.0, 1.0, tremolo=0.6, bright=5000), 7.0, 0.4, db(-34))
+    # 3. Tension ostinato: harp/pizzicato quavers in 3/4 that never stop, getting busier.
+    def arp(at, ln, chord, step, gain, pan_w=0.5):
+        notes = [m(n) for n in chord.split()]
+        pattern = [notes[0], notes[-1], notes[1], notes[-1] + 12 if len(notes) < 4 else notes[3], notes[1], notes[-1]]
+        k = 0
+        tt = at
+        while tt < at + ln - 0.02:
+            nt = pattern[k % len(pattern)]
+            place(dry, pizz(nt, 0.3 + 0.1 * (k % 2)), tt, pan_w * (1 if k % 2 else -1) * 0.6, gain * (1.0 if k % 3 == 0 else 0.7))
+            k += 1
+            tt += step
+    for at, ln, chord in PLAN[:5]:
+        arp(at, ln, chord, BEAT / 2, db(-24))
+    # standoff: semiquavers, louder bar by bar
+    for i, (at, ln, chord) in enumerate(PLAN[5:]):
+        arp(at, ln, chord, BEAT / 4, db(-17 + i * 0.8), 0.8)
+        place(dry, soft_pad([m(n) for n in chord.split()], ln + 0.15, 0.08, 0.12, bright=2200), at, 0.0, db(-23 + i))
 
-    # Dumbledore's line: Am colour, then only one celesta note between "wisely," and "Harry".
-    place(dry, strings([m("A2"), m("E3"), m("C4")], 2.1, 0.8, 0.6), 9.55, 0.0, db(-25))
-    place(dry, celesta(m("E6"), 2.5), 11.45, 0.25, db(-20))
-    place(dry, strings([m("C3"), m("G3"), m("E4")], 1.9, 0.6, 0.8), 11.4, 0.0, db(-27))
+    # 4. A soft low heartbeat under the standoff (felt drum, not a horror hit), speeding up.
+    hb = 13.3
+    while hb < scene.FLASH_AT - 0.2:
+        k = (hb - 13.3) / (scene.FLASH_AT - 13.3)
+        for off, g in ((0.0, 0.0), (0.16, -5.0)):
+            nn = int(0.35 * SR)
+            beat = np.sin(2 * np.pi * np.cumsum(70 * (1 + 0.4 * np.exp(-t_axis(nn) * 40))) / SR) * adsr(nn, 0.004, 0.09)
+            place(dry, beat, hb + off, 0.0, db(-17 + g + 5 * k))
+        hb += 0.95 - 0.35 * k
 
-    # Standoff: string tremolo climbing, timpani roll crescendo, low brass swell.
-    for at, chord in ((13.3, ["E3", "G3", "B3"]), (14.6, ["C3", "G3", "E4"]), (15.9, ["B2", "D#3", "F#3", "A3"])):
-        place(dry, strings([m(n) for n in chord], 1.45, 0.25, 0.15, tremolo=0.8, bright=2400), at, 0.0, db(-21))
-    brass = strings([m("E2"), m("B2"), m("E3")], 3.6, 2.8, 0.05, bright=900)
-    place(dry, brass * np.linspace(0.4, 1.0, len(brass)), 13.5, 0.0, db(-19))
-    roll_t = 14.6
-    while roll_t < scene.FLASH_AT - 0.05:
-        k = (roll_t - 14.6) / (scene.FLASH_AT - 14.6)
-        place(dry, timpani("E2", 0.5), roll_t, float(RNG.uniform(-0.2, 0.2)), db(-30 + 16 * k))
-        roll_t += 0.085 - 0.03 * k
+    # 5. Rising high string line into the flash (tension that resolves, not a shriek).
+    n = int((scene.FLASH_AT - 13.3) * SR)
+    tt = t_axis(n)
+    f = midi(m("B4")) * 2 ** (np.floor(np.linspace(0, 7, n)) / 12)  # stepwise climb, a semitone each half-bar
+    line = np.sin(2 * np.pi * np.cumsum(f * (1 + 0.004 * np.sin(2 * np.pi * 6 * tt))) / SR)
+    place(dry, line * np.linspace(0.3, 1.0, n) * adsr(n, 0.3, 99, 1.0, 0.05), 13.3, 0.2, db(-25))
 
-    # The flash: timpani + low boom + tubular bell + choir chord, ringing out.
-    hit = timpani("E2", 2.5) * 1.2
-    nb = int(2.5 * SR)
-    hit += np.sin(2 * np.pi * np.cumsum(65 * np.exp(-t_axis(nb) * 1.2) + 30) / SR) * np.exp(-t_axis(nb) / 0.9)
-    place(dry, hit, scene.FLASH_AT, 0.0, db(-15))
+    # 6. The flash: one deep bell + soft timpani + "ooh" choir + harp sweep, ringing out.
+    place(dry, timpani("E2", 2.5) * 0.8, scene.FLASH_AT, 0.0, db(-17))
     place(dry, bell(m("E4"), 5.0), scene.FLASH_AT, 0.1, db(-21))
-    place(dry, choir([m("E3"), m("B3"), m("E4"), m("G4")], 3.0, 0.02, 2.5), scene.FLASH_AT, 0.0, db(-21))
+    ooh = ((350, 80), (700, 90), (2600, 150))
+    place(dry, choir([m("E3"), m("B3"), m("E4"), m("G4")], 3.2, 0.05, 2.6, vowel=ooh), scene.FLASH_AT, 0.0, db(-19))
+    for i, note in enumerate(["E4", "G4", "B4", "D5", "E5", "G5", "B5", "D6", "E6"]):
+        place(dry, pluck(m(note), 2.0, 0.5), scene.FLASH_AT + 0.05 + i * 0.04, -0.5 + i * 0.12, db(-20))
 
-    # Ending under the info card: the motif returns, gentle strings, close on E minor (add 9).
+    # 7. Ending under the info card: the motif returns over a gentle quaver ostinato, closes on Em(add9).
     play_motif(dry, 18.15, db(-20), transpose_end="E6", pan=0.1)
-    for at, chord, dur in ((17.9, ["E3", "G3", "B3"], 2.1), (20.0, ["C3", "G3", "E4"], 2.1),
-                           (22.1, ["A2", "E3", "C4"], 1.0), (23.1, ["E3", "B3", "F#4", "G4"], 1.85)):
-        place(dry, strings([m(n) for n in chord], dur, 0.6, 0.6), at, 0.0, db(-24))
-    place(dry, choir([m("E4"), m("G4"), m("B4")], 2.0, 0.6, 1.2), 23.0, 0.0, db(-27))
+    for at, chord, ln in ((17.9, "E3 B3 G4", 2.1), (20.0, "C3 G3 E4", 2.1), (22.1, "A2 E3 C4", 1.0)):
+        arp(at, ln, chord, BEAT / 2, db(-28))
+        place(dry, soft_pad([m(n) for n in chord.split()], ln + 0.4, 0.6, 0.5), at, 0.0, db(-26))
+    place(dry, soft_pad([m(n) for n in "E3 B3 F#4 G4".split()], 1.85, 0.4, 1.0), 23.1, 0.0, db(-25))
+    place(dry, choir([m("E4"), m("G4"), m("B4")], 2.0, 0.6, 1.2, vowel=ooh), 23.0, 0.0, db(-29))
     place(dry, celesta(m("E5"), 1.9), 23.1, -0.2, db(-19))
     place(dry, celesta(m("B5"), 1.8), 23.1 + BEAT, 0.2, db(-22))
-    wet = reverb(dry, 0.38)
-    # Close cleanly: everything has rung out by the last frame.
+    wet = reverb(dry, 0.4)
     wet *= np.clip((DUR - 0.03 - t) / 1.2, 0, 1)[:, None] ** 1.5
     return wet
 
@@ -287,7 +335,7 @@ def sfx():
     n = int(1.6 * SR)
     whoom = np.sin(2 * np.pi * np.cumsum(55 * np.exp(-t_axis(n) * 0.8) + 32) / SR) * adsr(n, 0.25, 0.5)
     whoom += 0.3 * filt(RNG.standard_normal(n), "lowpass", 400) * adsr(n, 0.3, 0.4)
-    place(bus, reverb(whoom, 0.3), 6.72, 0.0, db(-17))
+    place(bus, reverb(whoom, 0.3), 6.72, 0.0, db(-22))
 
     # Energy building: two charged tones (green / blue) and a riser into the flash.
     n = int((scene.FLASH_AT - 13.6) * SR)
@@ -296,7 +344,7 @@ def sfx():
     green = np.sin(2 * np.pi * np.cumsum(164.8 * (1 + 0.004 * np.sin(2 * np.pi * 6 * tt))) / SR)
     blue = np.sin(2 * np.pi * np.cumsum(174.6 * (1 + 0.004 * np.sin(2 * np.pi * 5 * tt + 1))) / SR)
     crackle = filt(RNG.standard_normal(n) * (RNG.random(n) < 0.003), "bandpass", [2500, 6500])
-    place(bus, np.stack([green * ramp + crackle * ramp * 3, blue * ramp + crackle * ramp * 3], axis=1), 13.6, 0.0, db(-26))
+    place(bus, np.stack([green * ramp + crackle * ramp * 3, blue * ramp + crackle * ramp * 3], axis=1), 13.6, 0.0, db(-30))
     rise = filt(RNG.standard_normal(n), "bandpass", [700, 6500]) * ramp ** 2
     place(bus, rise, 13.6, 0.0, db(-32))
 
