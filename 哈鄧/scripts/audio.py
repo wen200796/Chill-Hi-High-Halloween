@@ -228,16 +228,25 @@ def harmonics(notes, dur, attack=1.5, release=1.5):
 
 
 def pizz(note, bright=0.35):
-    return pluck(note, 0.5, bright) * adsr(int(0.5 * SR), 0.001, 0.16)
+    # Rounder, softer pluck (more harp than pizzicato) so the ostinato floats.
+    x = pluck(note, 0.7, bright * 0.6) * adsr(int(0.7 * SR), 0.004, 0.28)
+    return filt(x, "lowpass", 2800)
 
 
 # Chord plan (time, length, root-position notes) for the ostinato and pads.
 #            Em                    Cmaj7                       G/B                      Am            C
 PLAN = [(0.6, 2.6, "E3 B3 G4"), (3.2, 3.5, "C3 G3 E4 B4"), (6.7, 2.85, "B2 G3 D4"), (9.55, 1.85, "A2 E3 C4"),
         (11.4, 1.9, "C3 G3 E4"),
-        # standoff: one chord a bar-half, climbing - Em, C, Am, B, Em, C, Am/F#, B7
-        (13.3, 0.5, "E3 B3 G4"), (13.8, 0.5, "C3 G3 E4"), (14.3, 0.5, "A2 E3 C4"), (14.8, 0.5, "B2 F#3 D#4"),
-        (15.3, 0.45, "E3 B3 G4"), (15.75, 0.45, "C3 G3 E4"), (16.2, 0.45, "F#3 A3 C4"), (16.65, 0.45, "B2 D#4 A4")]
+        ]
+# Standoff: eight chords packed into the (short) standoff, climbing - Em, C, Am, B, Em, C, F#dim, B7
+_SO = ["E3 B3 G4", "C3 G3 E4", "A2 E3 C4", "B2 F#3 D#4", "E3 B3 G4", "C3 G3 E4", "F#3 A3 C4", "B2 D#4 A4"]
+_STEP = (scene.FLASH_AT - scene.STANDOFF_AT) / len(_SO)
+PLAN += [(scene.STANDOFF_AT + i * _STEP, _STEP, ch) for i, ch in enumerate(_SO)]
+F = scene.FLASH_AT  # ending cues are written relative to the flash
+
+
+ooh = ((350, 80), (700, 90), (2600, 150))
+IR_CATHEDRAL = reverb_ir(5.0, 4.2, 5000, seed=3)
 
 
 def music():
@@ -246,7 +255,7 @@ def music():
 
     # 1. A quiet low pedal (pure sine, no saw grit) and airy pads: mystery, not menace.
     ped = np.sin(2 * np.pi * midi(m("E2")) * t) * 0.6 + np.sin(2 * np.pi * midi(m("B2")) * t) * 0.25
-    lvl = np.interp(t, [0, 2, 13.3, 17.0, 17.1, 18, 24, 25], [0, 0.7, 0.8, 1.2, 0.4, 0.6, 0.6, 0])
+    lvl = np.interp(t, [0, 2, scene.STANDOFF_AT, F - 0.1, F, F + 0.9, DUR - 1, DUR], [0, 0.7, 0.8, 1.2, 0.4, 0.6, 0.6, 0])
     dry += (ped * lvl)[:, None] * db(-26)
     for at, ln, chord in PLAN[:5]:
         place(dry, soft_pad([m(n) for n in chord.split()], ln + 0.6, 0.8, 0.7), at - 0.2, 0.0, db(-25))
@@ -275,40 +284,45 @@ def music():
         place(dry, soft_pad([m(n) for n in chord.split()], ln + 0.15, 0.08, 0.12, bright=2200), at, 0.0, db(-23 + i))
 
     # 4. A soft low heartbeat under the standoff (felt drum, not a horror hit), speeding up.
-    hb = 13.3
-    while hb < scene.FLASH_AT - 0.2:
-        k = (hb - 13.3) / (scene.FLASH_AT - 13.3)
+    hb = scene.STANDOFF_AT
+    while hb < F - 0.2:
+        k = (hb - scene.STANDOFF_AT) / (F - scene.STANDOFF_AT)
         for off, g in ((0.0, 0.0), (0.16, -5.0)):
             nn = int(0.35 * SR)
             beat = np.sin(2 * np.pi * np.cumsum(70 * (1 + 0.4 * np.exp(-t_axis(nn) * 40))) / SR) * adsr(nn, 0.004, 0.09)
-            place(dry, beat, hb + off, 0.0, db(-17 + g + 5 * k))
-        hb += 0.95 - 0.35 * k
+            place(dry, beat, hb + off, 0.0, db(-22 + g + 5 * k))
+        hb += 0.6 - 0.25 * k
 
     # 5. Rising high string line into the flash (tension that resolves, not a shriek).
-    n = int((scene.FLASH_AT - 13.3) * SR)
+    n = int((F - scene.STANDOFF_AT) * SR)
     tt = t_axis(n)
     f = midi(m("B4")) * 2 ** (np.floor(np.linspace(0, 7, n)) / 12)  # stepwise climb, a semitone each half-bar
     line = np.sin(2 * np.pi * np.cumsum(f * (1 + 0.004 * np.sin(2 * np.pi * 6 * tt))) / SR)
-    place(dry, line * np.linspace(0.3, 1.0, n) * adsr(n, 0.3, 99, 1.0, 0.05), 13.3, 0.2, db(-25))
+    place(dry, line * np.linspace(0.3, 1.0, n) * adsr(n, 0.3, 99, 1.0, 0.05), scene.STANDOFF_AT, 0.2, db(-25))
 
     # 6. The flash: one deep bell + soft timpani + "ooh" choir + harp sweep, ringing out.
     place(dry, timpani("E2", 2.5) * 0.8, scene.FLASH_AT, 0.0, db(-17))
     place(dry, bell(m("E4"), 5.0), scene.FLASH_AT, 0.1, db(-21))
-    ooh = ((350, 80), (700, 90), (2600, 150))
     place(dry, choir([m("E3"), m("B3"), m("E4"), m("G4")], 3.2, 0.05, 2.6, vowel=ooh), scene.FLASH_AT, 0.0, db(-19))
     for i, note in enumerate(["E4", "G4", "B4", "D5", "E5", "G5", "B5", "D6", "E6"]):
         place(dry, pluck(m(note), 2.0, 0.5), scene.FLASH_AT + 0.05 + i * 0.04, -0.5 + i * 0.12, db(-20))
 
     # 7. Ending under the info card: the motif returns over a gentle quaver ostinato, closes on Em(add9).
-    play_motif(dry, 18.15, db(-20), transpose_end="E6", pan=0.1)
-    for at, chord, ln in ((17.9, "E3 B3 G4", 2.1), (20.0, "C3 G3 E4", 2.1), (22.1, "A2 E3 C4", 1.0)):
+    play_motif(dry, F + 1.05, db(-20), transpose_end="E6", pan=0.1)
+    for at, chord, ln in ((F + 0.8, "E3 B3 G4", 2.1), (F + 2.9, "C3 G3 E4", 2.1), (F + 5.0, "A2 E3 C4", 1.0)):
         arp(at, ln, chord, BEAT / 2, db(-28))
         place(dry, soft_pad([m(n) for n in chord.split()], ln + 0.4, 0.6, 0.5), at, 0.0, db(-26))
-    place(dry, soft_pad([m(n) for n in "E3 B3 F#4 G4".split()], 1.85, 0.4, 1.0), 23.1, 0.0, db(-25))
-    place(dry, choir([m("E4"), m("G4"), m("B4")], 2.0, 0.6, 1.2, vowel=ooh), 23.0, 0.0, db(-29))
-    place(dry, celesta(m("E5"), 1.9), 23.1, -0.2, db(-19))
-    place(dry, celesta(m("B5"), 1.8), 23.1 + BEAT, 0.2, db(-22))
-    wet = reverb(dry, 0.4)
+    place(dry, soft_pad([m(n) for n in "E3 B3 F#4 G4".split()], 1.85, 0.4, 1.0), F + 6.0, 0.0, db(-25))
+    place(dry, choir([m("E4"), m("G4"), m("B4")], 2.0, 0.6, 1.2, vowel=ooh), F + 5.9, 0.0, db(-29))
+    place(dry, celesta(m("E5"), 1.9), F + 6.0, -0.2, db(-19))
+    place(dry, celesta(m("B5"), 1.8), F + 6.0 + BEAT, 0.2, db(-22))
+    # Ethereal halo: a very soft high "ooh" choir and glassy harmonics breathing through the piece.
+    for at, ln, chord in PLAN[:5]:
+        notes = [m(n) + 12 for n in chord.split()[1:]]
+        place(dry, choir(notes, ln + 1.0, 1.0, 1.2, vowel=ooh), at - 0.3, 0.0, db(-31))
+    place(dry, harmonics([m("E6"), m("B6")], F - 0.5, 2.5, 2.0), 0.5, 0.0, db(-38))
+    place(dry, harmonics([m("G6"), m("D7")], DUR - F - 0.6, 1.5, 1.8), F + 0.4, 0.0, db(-38))
+    wet = reverb(dry, 0.55, IR_CATHEDRAL)
     wet *= np.clip((DUR - 0.03 - t) / 1.2, 0, 1)[:, None] ** 1.5
     return wet
 
@@ -316,12 +330,13 @@ def music():
 def sfx():
     bus = np.zeros((N, 2))
     t = t_axis(N)
-    # Ambience: distant wind in a stone hall, and a faint magical hum (two close tones beating).
+    # Ambience: distant wind in a stone hall (louder, more air) , and a faint magical hum (two close tones beating).
     wind = filt(RNG.standard_normal(N), "bandpass", [180, 900])
     wind *= 0.6 + 0.4 * np.sin(2 * np.pi * 0.13 * t + 1)
     hum = 0.5 * np.sin(2 * np.pi * 329.6 * t) + 0.5 * np.sin(2 * np.pi * 331.1 * t)
-    amb_lvl = np.interp(t, [0, 1.5, 17.0, 17.1, 18.0, 24.0, 25.0], [0, 1, 1, 0.5, 0.8, 0.6, 0])
-    bus += np.stack([wind, np.roll(wind, 900)], axis=1) * amb_lvl[:, None] * db(-36)
+    F = scene.FLASH_AT
+    amb_lvl = np.interp(t, [0, 1.5, F - 0.1, F, F + 0.9, DUR - 1, DUR], [0, 1, 1, 0.5, 0.8, 0.6, 0])
+    bus += np.stack([wind, np.roll(wind, 900)], axis=1) * amb_lvl[:, None] * db(-33)
     bus += (hum * amb_lvl)[:, None] * db(-44)
 
     # Words lighting up: the faintest glint per English word (kept far under the voice).
@@ -338,15 +353,15 @@ def sfx():
     place(bus, reverb(whoom, 0.3), 6.72, 0.0, db(-22))
 
     # Energy building: two charged tones (green / blue) and a riser into the flash.
-    n = int((scene.FLASH_AT - 13.6) * SR)
+    n = int((scene.FLASH_AT - scene.STANDOFF_AT - 0.1) * SR)
     tt = t_axis(n)
     ramp = np.linspace(0, 1, n) ** 1.8
     green = np.sin(2 * np.pi * np.cumsum(164.8 * (1 + 0.004 * np.sin(2 * np.pi * 6 * tt))) / SR)
     blue = np.sin(2 * np.pi * np.cumsum(174.6 * (1 + 0.004 * np.sin(2 * np.pi * 5 * tt + 1))) / SR)
     crackle = filt(RNG.standard_normal(n) * (RNG.random(n) < 0.003), "bandpass", [2500, 6500])
-    place(bus, np.stack([green * ramp + crackle * ramp * 3, blue * ramp + crackle * ramp * 3], axis=1), 13.6, 0.0, db(-30))
+    place(bus, np.stack([green * ramp + crackle * ramp * 3, blue * ramp + crackle * ramp * 3], axis=1), scene.STANDOFF_AT + 0.1, 0.0, db(-30))
     rise = filt(RNG.standard_normal(n), "bandpass", [700, 6500]) * ramp ** 2
-    place(bus, rise, 13.6, 0.0, db(-32))
+    place(bus, rise, scene.STANDOFF_AT + 0.1, 0.0, db(-32))
 
     # The flash itself: a short magical impact with a bright shimmer.
     n = int(1.2 * SR)

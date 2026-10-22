@@ -21,7 +21,11 @@ FONT_DIR = ROOT / "output/_build/fonts"
 
 W, H = 1080, 1920
 FPS = 24
-DURATION = 25.0
+# Standoff is quick (2.4 s) and the held ending keeps the trickster/hero length (7.9 s after the flash).
+STANDOFF_AT = 13.30
+FLASH_AT = 15.70  # energies meet
+INFO_AT = FLASH_AT + 0.65   # meeting-info card starts (same offset after the impact as the trickster/hero card)
+DURATION = FLASH_AT + 7.9   # 23.6 s
 # Platform text-safe area for 9:16, from the project's 文字檢查框.png (guide lines at x 16/283,
 # y 82/475.5 on 335x597) scaled to 1080x1920. Every glyph must stay inside.
 SAFE_BOX = (52, 265, 912, 1529)
@@ -52,12 +56,10 @@ SHOTS = [
     (4.30, 6.70, "s2b_harry_close"),
     (6.70, 9.55, "s3_over_shoulder"),
     (9.55, 11.40, "s4a_dumbledore"),
-    (11.40, 13.30, "s4b_dumbledore_eyes"),
-    (13.30, 17.10, "s5_standoff"),
-    (17.10, DURATION, "s6_hold"),
+    (11.40, STANDOFF_AT, "s4b_dumbledore_eyes"),
+    (STANDOFF_AT, FLASH_AT, "s5_standoff"),
+    (FLASH_AT, DURATION, "s6_hold"),
 ]
-FLASH_AT = 17.10  # energies meet; from here the frame holds 7.9 s, same as the trickster/hero ending
-INFO_AT = 17.75   # meeting-info card starts (same offset after the impact as the trickster/hero card)
 
 FULL_BODY = {"harry_1", "dumbledore_1"}
 
@@ -523,6 +525,55 @@ def s6_hold(c, t, lt, u):
                   floor_dark=0.3)
 
 
+# Mist and magic laid over every shot: (left tint, right tint, amount).
+ATMOS = {
+    "s1_hall": (EMERALD, EMERALD, 1.0), "s2a_harry": (EMERALD, EMERALD, 0.8),
+    "s2b_harry_close": (EMERALD, EMERALD, 0.7), "s3_over_shoulder": (EMERALD, SILVER * 0.6 + MIDNIGHT * 0.4, 0.9),
+    "s4a_dumbledore": (SILVER * 0.6 + MIDNIGHT * 0.4, SILVER * 0.6 + MIDNIGHT * 0.4, 0.8),
+    "s4b_dumbledore_eyes": (SILVER * 0.6 + MIDNIGHT * 0.4, SILVER * 0.6 + MIDNIGHT * 0.4, 0.6),
+    "s5_standoff": (EMERALD, SILVER * 0.6 + MIDNIGHT * 0.4, 1.0), "s6_hold": (EMERALD, SILVER * 0.6 + MIDNIGHT * 0.4, 1.0),
+}
+_XR = np.linspace(0, 1, W, dtype=np.float32)[None, :, None]
+_YR = np.linspace(0, 1, H, dtype=np.float32)[:, None, None]
+
+
+def atmosphere(c, t, name):
+    """Rolling low mist, a drifting mid-height haze, slow glowing wisps and twinkling motes."""
+    left, right, amt = ATMOS[name]
+    tint = left * (1 - _XR) + right * _XR
+    # Two mist banks moving at different speeds (parallax), thickest near the floor.
+    for speed, low, strength, off in ((22, 0.55, 0.42, 0), (-14, 0.3, 0.22, W // 2)):
+        o = (int(t * speed) + off) % W
+        f = A.fog[:, o:o + W][..., None]
+        mask = f * smoothstep(low, 1.0, _YR) * (0.6 + 0.4 * f)
+        screen(c, mask * (0.55 * tint + 0.45 * SILVER * 0.5), strength * amt)
+    # A soft overall haze that lifts the blacks a little, like air full of fine mist.
+    screen(c, (0.12 * tint + 0.05) * (0.6 + 0.4 * smoothstep(0.2, 1.0, _YR)), 0.5 * amt)
+    # Slow glowing wisps of magic smoke.
+    lay = np.zeros((H // 4, W // 4), np.float32)
+    for k in range(4):
+        ph = k * 1.9
+        base_y = (0.25 + 0.18 * k) * H / 4
+        pts = [(x, base_y + 18 * math.sin(x / 40 + t * (0.5 + 0.1 * k) + ph) + 8 * math.sin(x / 13 - t * 0.9 + k))
+               for x in np.linspace(-20, W / 4 + 20, 40)]
+        cv2.polylines(lay, [np.int32(pts)], False, 0.7, 2, cv2.LINE_AA)
+    lay = cv2.GaussianBlur(lay, (0, 0), 3.5) * (0.55 + 0.45 * np.sin(t * 0.8 + _XR[..., 0][:, ::4] * 6) ** 2)[:H // 4]
+    wisps = cv2.resize(lay, (W, H))[..., None]
+    screen(c, wisps * tint, 0.5 * amt)
+    # Twinkling motes with tiny cross flares.
+    rng = np.random.default_rng(int(t * 3) + 100)
+    pts = np.zeros((H // 2, W // 2), np.float32)
+    for _ in range(int(26 * amt)):
+        x, y = rng.uniform(0, W / 2), rng.uniform(0, H / 2)
+        tw = math.sin(math.pi * ((t * 3) % 1)) * rng.uniform(0.4, 1.0)
+        cv2.circle(pts, (int(x), int(y)), 1, tw, -1, cv2.LINE_AA)
+        cv2.line(pts, (int(x) - 5, int(y)), (int(x) + 5, int(y)), tw * 0.5, 1, cv2.LINE_AA)
+        cv2.line(pts, (int(x), int(y) - 5), (int(x), int(y) + 5), tw * 0.5, 1, cv2.LINE_AA)
+    pts = cv2.resize(cv2.GaussianBlur(pts, (0, 0), 1.0) * 1.8 + pts, (W, H))[..., None]
+    screen(c, pts * (0.5 * tint + 0.5), 0.8 * amt)
+    return np.clip(c, 0, 1)
+
+
 SHOT_FUNCS = {name: globals()[name] for _, _, name in SHOTS}
 
 
@@ -538,6 +589,9 @@ def render_frame(t, lettering=True):
     s, e, name = shot_at(t)
     c = np.zeros((H, W, 3), np.float32)
     frame = SHOT_FUNCS[name](c, t, t - s, (t - s) / (e - s))
+    frame = atmosphere(frame, t, name)
+    if name == "s6_hold" and t > DURATION - 0.25:
+        frame *= 1 - ease((t - (DURATION - 0.25)) / 0.25)
     if lettering:
         import magic_text
         frame = magic_text.draw(frame, t)
