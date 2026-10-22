@@ -31,6 +31,10 @@ HERO_IMPACT_AT = 7.60
 CAPE_AT = 8.05
 SMILE_GLITCH_AT = 15.85
 CLASH_AT = scene.IMPACT_AT
+INFO_AT = scene.INFO_AT
+CARD_AT = INFO_AT + 0.15          # info card lands (matches scene.overlays)
+PRIZE_AT = INFO_AT + 1.5          # first of the four bouncing prize characters
+ENDING_AT = DUR - 0.85            # closing button under the info card
 FADE_END = DUR - 0.02
 TARGET_LUFS = -16.0
 
@@ -213,6 +217,36 @@ def music():
     wash = filt(noise(n), "highpass", 4000) * adsr(n, 0.002, 0.7) * 0.25
     tail = reverb(hit * 0.9 + stab + wash, 0.45, reverb_ir(2.6, 2.4, 4000))
     place(bus, tail, CLASH_AT, gain=db(-13))
+
+    # 8. Outro bed under the info card: both themes together, kept low so the card reads.
+    start, stop = INFO_AT + 0.1, ENDING_AT
+    n = int((stop - start + 0.4) * SR)
+    bed = sum(saw(midi(m), n, d) for m in (38, 45, 50) for d in (-0.004, 0.005))
+    bed = filt(bed, "lowpass", 600, 4) * adsr(n, 0.6, 99, 1.0, 0.4)
+    place(bus, np.stack([bed, np.roll(bed, 300)], axis=1), start, gain=db(-31))
+    for k, at in enumerate(np.arange(start, stop, BEAT)):
+        n = int(0.5 * SR)
+        place(bus, sweep_sine(100, 45, n, 16) * adsr(n, 0.004, 0.15), at, gain=db(-19))  # pulse
+        if k % 2 == 1:
+            n = int(0.9 * SR)
+            drum = sweep_sine(90, 44, n, 10) * adsr(n, 0.003, 0.3)
+            place(bus, reverb(drum, 0.25), at, gain=db(-19))  # hero drum, softer
+    outro_rng = np.random.default_rng(31)
+    step = BEAT / 4
+    for k in range(int(start / step) + 1, int(stop / step)):
+        at = k * step + (0.035 if k % 2 else 0.0)
+        if outro_rng.random() < 0.28:  # sparser trickster blips
+            n = int(0.08 * SR)
+            f = midi(int(outro_rng.choice(scale)))
+            sq = filt(np.sign(np.sin(2 * np.pi * f * t_axis(n))), "bandpass", [600, 4500]) * adsr(n, 0.001, 0.022)
+            place(bus, sq, at, float(outro_rng.uniform(-0.7, 0.7)), db(-36))
+
+    # 9. Closing button: one short low hit and a stab, ringing out before the last frame.
+    n = int(0.85 * SR)
+    end_hit = sweep_sine(80, 36, n, 5) * adsr(n, 0.003, 0.3)
+    end_stab = filt(sum(saw(midi(m), n, d) for m in (38, 50, 53, 57) for d in (-0.004, 0.005)), "lowpass", 1800, 4)
+    end_stab *= adsr(n, 0.005, 0.18) * 0.2
+    place(bus, reverb(end_hit + end_stab, 0.35, reverb_ir(0.9, 0.7, 5000)), ENDING_AT, gain=db(-11))
     return bus
 
 
@@ -266,6 +300,20 @@ def sfx():
     crack = filt(noise(n), "bandpass", [900, 4500]) * adsr(n, 0.001, 0.07)
     low = sweep_sine(90, 34, n, 4) * adsr(n, 0.003, 0.6)
     place(bus, reverb(snap * 0.6 + crack * 0.8 + low, 0.4, reverb_ir(2.4, 2.2, 6000)), CLASH_AT, gain=db(-12))
+
+    # Info card lands: a papery slap with a small low thud.
+    n = int(0.3 * SR)
+    slap = filt(noise(n), "bandpass", [300, 3500]) * adsr(n, 0.001, 0.035)
+    thud = sweep_sine(140, 60, n, 20) * adsr(n, 0.002, 0.06)
+    place(bus, slap * 0.7 + thud, CARD_AT, gain=db(-16))
+    # Club ribbon: a lighter slap.
+    place(bus, slap * 0.6, CARD_AT + 0.2, 0.3, db(-23))
+    # "神秘小禮": four bubbly pops climbing D minor, one per character.
+    for i, m in enumerate((74, 77, 81, 86)):
+        n = int(0.14 * SR)
+        f0 = midi(m)
+        pop = np.sin(2 * np.pi * np.cumsum(f0 * (1 + 0.6 * np.exp(-t_axis(n) * 60))) / SR) * adsr(n, 0.002, 0.04)
+        place(bus, pop, PRIZE_AT + i * 0.14, -0.45 + 0.3 * i, db(-24))
     return bus
 
 
