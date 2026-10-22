@@ -37,8 +37,17 @@ CREAM = (240, 228, 200, 255)
 _L = None
 
 
+# Card typefaces: (file, variable-weight or None). English is only the club name.
+FONTS = {"en": ("Metamorphous-Regular.ttf", None), "zh": ("LXGWWenKaiTC-Bold.ttf", None)}
+
+
 def _font(name, size):
-    return ImageFont.truetype(str(scene.FONT_DIR / name), size)
+    """`name` is a role ("en"/"zh") from FONTS, or a font file name."""
+    file, weight = FONTS.get(name, (name, None))
+    f = ImageFont.truetype(str(scene.FONT_DIR / file), size)
+    if weight:
+        f.set_variation_by_axes([weight])
+    return f
 
 
 def _premul(img, ss):
@@ -51,6 +60,56 @@ def _premul(img, ss):
 def _bbox(arr):
     ys, xs = np.where(arr[..., 3] > 0.04)
     return (int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1)
+
+
+def smoothstep_np(e0, e1, x):
+    k = np.clip((x - e0) / (e1 - e0), 0, 1)
+    return k * k * (3 - 2 * k)
+
+
+def _parchment_texture(rgb, box, ss):
+    """Aged parchment: blotches at two scales, paper fibres, faint water stains, darkened edges, grain.
+
+    Everything is a multiplier on the plain parchment colour, so it stays one muted sepia palette.
+    """
+    x0, y0, x1, y1 = [int(v) for v in box]
+    h, w = y1 - y0, x1 - x0
+    rng = np.random.default_rng(7)
+
+    def noise(cells, sigma):
+        n = cv2.resize(rng.random(cells).astype(np.float32), (w, h), interpolation=cv2.INTER_CUBIC)
+        n = cv2.GaussianBlur(n, (0, 0), sigma)
+        return (n - n.min()) / (n.max() - n.min() + 1e-6)
+
+    tone = 1.0 - 0.14 * noise((6, 8), 40 * ss) - 0.10 * noise((18, 24), 12 * ss) - 0.05 * noise((60, 80), 3 * ss)
+    # Paper fibres: many short, slightly curved strokes, a touch darker or lighter than the sheet.
+    fib = np.zeros((h, w), np.float32)
+    for _ in range(int(w * h / (500 * ss * ss))):
+        fx, fy = rng.uniform(0, w), rng.uniform(0, h)
+        ang = rng.uniform(-0.5, 0.5) + (0 if rng.random() < 0.7 else np.pi / 2)
+        ln = rng.uniform(10, 46) * ss
+        bend = rng.uniform(-6, 6) * ss
+        pts = [(fx + math.cos(ang) * ln * u - math.sin(ang) * bend * math.sin(math.pi * u),
+                fy + math.sin(ang) * ln * u + math.cos(ang) * bend * math.sin(math.pi * u)) for u in np.linspace(0, 1, 6)]
+        cv2.polylines(fib, [np.int32(pts)], False, float(rng.choice([-1.0, 1.0]) * rng.uniform(0.4, 1.0)), 1, cv2.LINE_AA)
+    tone += 0.10 * cv2.GaussianBlur(fib, (0, 0), 0.7)
+    # Faint water stains: soft rings with a darker rim.
+    yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
+    for _ in range(3):
+        cx, cy, r = rng.uniform(0.15, 0.85) * w, rng.uniform(0.2, 0.8) * h, rng.uniform(60, 130) * ss
+        d = np.sqrt((xx - cx) ** 2 + (yy - cy) ** 2) / r
+        tone -= 0.03 * np.exp(-((d - 1) / 0.10) ** 2) + 0.02 * smoothstep_np(1.0, 0.6, d)
+    # Edges darkened and uneven, like handled old paper.
+    edge = np.minimum.reduce([xx, w - 1 - xx, yy, h - 1 - yy]) / (55 * ss)
+    edge = np.clip(edge + 0.35 * (noise((10, 14), 10 * ss) - 0.5), 0, 1)
+    tone *= 0.72 + 0.28 * (1 - (1 - edge) ** 2)
+    tone += 0.035 * (rng.random((h, w)).astype(np.float32) - 0.5)  # fine grain
+    out = rgb.copy()
+    out[y0:y1, x0:x1] = rgb[y0:y1, x0:x1] * np.clip(tone, 0.55, 1.08)[..., None]
+    # A slight warm-brown cast in the darker areas keeps the ageing sepia, not grey.
+    dark = np.clip(1 - tone, 0, 1)[..., None]
+    out[y0:y1, x0:x1] = out[y0:y1, x0:x1] * (1 - 0.25 * dark) + 0.25 * dark * np.array((0.45, 0.30, 0.16), np.float32)
+    return np.clip(out, 0, 1)
 
 
 def _build():
@@ -73,18 +132,15 @@ def _build():
         k = 9 * ss
         d.polygon([(cx, cy - k), (cx + k, cy), (cx, cy + k), (cx - k, cy)], fill=GOLD, outline=INK)
     body = np.asarray(im).astype(np.float32) / 255
-    # Aged-paper mottling, only on the parchment.
-    rng = np.random.default_rng(3)
-    n = cv2.resize(rng.random((40, 30)).astype(np.float32), (W * ss, H * ss), interpolation=cv2.INTER_CUBIC)
-    n = cv2.GaussianBlur(n, (0, 0), 30 * ss)
-    paper = (np.abs(body[..., :3] - np.array(PARCHMENT[:3]) / 255).sum(axis=2) < 0.02)[..., None]
-    body[..., :3] = np.where(paper, body[..., :3] * (0.9 + 0.12 * n[..., None]), body[..., :3])
+    paper = (np.abs(body[..., :3] - np.array(PARCHMENT[:3]) / 255).sum(axis=2) < 0.02)
+    body[..., :3] = np.where(paper[..., None], _parchment_texture(body[..., :3], (x0, y0, x1, y1), ss),
+                             body[..., :3])
     L["body"] = _premul(Image.fromarray((np.clip(body, 0, 1) * 255).astype(np.uint8), "RGBA"), ss)
 
     # Club ribbon across the top edge: leather-brown banner, gold rule, cream lettering.
     im, d = canvas()
-    en = _font("Metamorphous-Regular.ttf", 46 * ss)
-    zh = _font("LXGWWenKaiTC-Bold.ttf", 36 * ss)
+    en = _font("en", 46 * ss)
+    zh = _font("zh", 36 * ss)
     ew, zw = d.textlength(CLUB_NAME[0], font=en), d.textlength(CLUB_NAME[1], font=zh)
     gap = 16 * ss
     total = ew + gap + zw
@@ -104,8 +160,8 @@ def _build():
     L["ribbon_c"] = (cx / ss, cy / ss)
 
     # Info rows: coloured chip + ink text (each row is written in by a spark).
-    chip_f = _font("LXGWWenKaiTC-Bold.ttf", 32 * ss)
-    row_f = _font("LXGWWenKaiTC-Bold.ttf", 40 * ss)
+    chip_f = _font("zh", 32 * ss)
+    row_f = _font("zh", 40 * ss)
     chips = [LEATHER, LEATHER, LEATHER]
     rows = []
     for i, ((label, text), col) in enumerate(zip(INFO_LINES, chips)):
@@ -128,7 +184,7 @@ def _build():
     d.line((x0 + 60 * ss, dy, x1 - 60 * ss, dy), fill=GOLD, width=2 * ss)
     mx = (x0 + x1) / 2
     d.polygon([(mx, dy - 8 * ss), (mx + 8 * ss, dy), (mx, dy + 8 * ss), (mx - 8 * ss, dy)], fill=GOLD, outline=INK)
-    call_f = _font("LXGWWenKaiTC-Bold.ttf", 42 * ss)
+    call_f = _font("zh", 42 * ss)
     cw = d.textlength(INFO_CALL, font=call_f)
     cb = call_f.getbbox(INFO_CALL)
     d.text((mx - cw / 2, dy + 52 * ss - (cb[3] + cb[1]) / 2), INFO_CALL, font=call_f, fill=(110, 40, 26, 255))
@@ -137,8 +193,8 @@ def _build():
 
     # Prize line: ink lead/tail text plus four glowing gold characters.
     pre, prize, post = INFO_PRIZE
-    small = _font("LXGWWenKaiTC-Bold.ttf", 38 * ss)
-    big = _font("LXGWWenKaiTC-Bold.ttf", 60 * ss)
+    small = _font("zh", 38 * ss)
+    big = _font("zh", 60 * ss)
     char_w = 66 * ss
     pw, qw = d.textlength(pre, font=small), d.textlength(post, font=small)
     total = pw + 16 * ss + char_w * len(prize) + 16 * ss + qw
