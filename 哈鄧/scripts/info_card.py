@@ -38,7 +38,7 @@ _L = None
 
 
 # Card typefaces: (file, variable-weight or None). English is only the club name.
-FONTS = {"en": ("Metamorphous-Regular.ttf", None), "zh": ("LXGWWenKaiTC-Bold.ttf", None)}
+FONTS = {"en": ("CinzelDecorative-Bold.ttf", None), "zh": ("NotoSerifTC.ttf", 900)}  # option D, chosen
 
 
 def _font(name, size):
