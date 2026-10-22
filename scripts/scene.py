@@ -21,7 +21,7 @@ FONT_DIR = ROOT / "output/_build/fonts"
 
 W, H = 1080, 1920
 FPS = 30
-DURATION = 19.8
+DURATION = 22.8
 
 # Voice placement on the master timeline (seconds). Word timings were measured
 # with forced alignment on the original files; see the report.
@@ -47,6 +47,21 @@ BALLOONS = [
     ("hero", (520, 1620), (800, 250), (660, 1380)),
 ]
 SFX_WORD = "KRAK!"
+# Role name tags (Chinese only): (text, start, end, center, style).
+ROLE_TAGS = [
+    ("演講員", 1.00, 2.90, (250, 1600), "trickster"),
+    ("個別講評", 7.85, 9.85, (300, 1600), "hero"),
+]
+# Meeting info card on the final standoff. Full street address goes in the post caption.
+INFO_AT = 17.85
+CLUB_NAME = ("Chill Hi High", "中英雙語國際演講會")
+INFO_LINES = [
+    ("日期", "10/27（二）19:15–21:15"),
+    ("地點", "社會創新實驗中心 107 會議室"),
+    ("交通", "忠孝復興站 2 號出口 步行 7 分鐘"),
+]
+INFO_CALL = "歡迎大家一起變裝出場！"
+INFO_PRIZE = ("現場還有", "神秘小禮", "抽獎等你帶走！")
 # In balloon mode the dialogue close-ups sit a little lower to leave headroom.
 JOKER_DROP = 190 if LETTERING == "balloon" else 0
 
@@ -63,7 +78,8 @@ SHOTS = [
     (12.25, 15.00, "s09_potential"),
     (15.00, 15.85, "s10_smile_freeze"),
     (15.85, 16.75, "s11_smile_returns"),
-    (16.75, DURATION, "s12_standoff"),
+    (16.75, 17.85, "s12_standoff"),
+    (17.85, DURATION, "s13_info"),
 ]
 
 PURPLE = np.array([0.62, 0.18, 0.95], np.float32)
@@ -244,6 +260,8 @@ class Assets:
         self.balloons = [(s, e, style, make_balloon(style, c, size, tip, en_t, zh_t))
                          for (s, e, en_t, zh_t), (style, c, size, tip) in zip(SUBS, BALLOONS)]
         self.sfx_word = make_sfx_word(SFX_WORD)
+        self.tags = [(s, e, make_tag(text, c, style), c) for text, s, e, c, style in ROLE_TAGS]
+        self.info = make_info_card()
 
 
 A = None
@@ -513,6 +531,190 @@ def make_sfx_word(word):
     return arr
 
 
+def _premul(img):
+    arr = np.asarray(img).astype(np.float32) / 255
+    arr[..., :3] *= arr[..., 3:4]
+    return arr
+
+
+def _shadowed_box(d, box, fill, shadow, offset, border=8, radius=0):
+    x0, y0, x1, y1 = box
+    d.rounded_rectangle((x0 + offset, y0 + offset, x1 + offset, y1 + offset), radius, fill=shadow)
+    d.rounded_rectangle(box, radius, fill=fill, outline=(12, 8, 20, 255), width=border)
+
+
+def make_tag(text, center, style):
+    """Comic name tag: yellow slab, heavy ink border, colored offset shadow, tilted."""
+    ss = 2
+    f = _font("NotoSansTC.ttf", 84 * ss, 900)
+    img = Image.new("RGBA", (W * ss, H * ss), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    tw = d.textlength(text, font=f)
+    bb = f.getbbox(text)
+    padx, pady = 44 * ss, 26 * ss
+    cx, cy = center[0] * ss, center[1] * ss
+    box = (cx - tw / 2 - padx, cy - (bb[3] - bb[1]) / 2 - pady, cx + tw / 2 + padx, cy + (bb[3] - bb[1]) / 2 + pady)
+    shadow = (120, 30, 180, 255) if style == "trickster" else (40, 110, 230, 255)
+    _shadowed_box(d, box, (255, 216, 60, 255), shadow, 14 * ss, 7 * ss)
+    d.text((cx - tw / 2, cy - (bb[3] - bb[1]) / 2 - bb[1]), text, font=f, fill=(18, 10, 24, 255))
+    rot = -4 if style == "trickster" else 3
+    img = img.rotate(rot, resample=Image.BICUBIC, center=(cx, cy)).resize((W, H), Image.LANCZOS)
+    return _premul(img)
+
+
+INFO_BOX = (50, 700, 1030, 1236)  # card body on the 1080x1920 frame
+
+
+def make_info_card():
+    """Layers of the meeting-info card, each a full-frame premultiplied RGBA, animated separately."""
+    ss = 2
+    x0, y0, x1, y1 = [v * ss for v in INFO_BOX]
+    layers = {}
+
+    def canvas():
+        im = Image.new("RGBA", (W * ss, H * ss), (0, 0, 0, 0))
+        return im, ImageDraw.Draw(im)
+
+    def done(im):
+        return _premul(im.resize((W, H), Image.LANCZOS))
+
+    # Body: cream paper, ink border, split shadow (purple for him above, blue for him below).
+    im, d = canvas()
+    d.rounded_rectangle((x0 - 16 * ss, y0 - 16 * ss, x1 - 16 * ss, y1 - 16 * ss), 18 * ss, fill=(130, 40, 190, 255))
+    d.rounded_rectangle((x0 + 16 * ss, y0 + 16 * ss, x1 + 16 * ss, y1 + 16 * ss), 18 * ss, fill=(40, 110, 230, 255))
+    d.rounded_rectangle((x0, y0, x1, y1), 18 * ss, fill=(255, 249, 232, 255), outline=(12, 8, 20, 255), width=8 * ss)
+    # Halftone dots in the lower-right corner of the paper.
+    for gy in range(int(y1 - 150 * ss), int(y1 - 12 * ss), 16 * ss):
+        for gx in range(int(x1 - 260 * ss), int(x1 - 12 * ss), 16 * ss):
+            r = max(0, ((gx - (x1 - 260 * ss)) / (248 * ss) + (gy - (y1 - 150 * ss)) / (138 * ss)) / 2) * 4.5 * ss
+            if r > 0.6 * ss:
+                d.ellipse((gx - r, gy - r, gx + r, gy + r), fill=(255, 216, 60, 255))
+    layers["body"] = done(im)
+
+    # Club-name ribbon across the top edge.
+    im, d = canvas()
+    en = _font("Bangers-Regular.ttf", 66 * ss)
+    zh = _font("NotoSansTC.ttf", 46 * ss, 900)
+    ew, zw = d.textlength(CLUB_NAME[0], font=en), d.textlength(CLUB_NAME[1], font=zh)
+    gap = 18 * ss
+    total = ew + gap + zw
+    cx, cy = (x0 + x1) / 2, y0 - 6 * ss
+    rb = (cx - total / 2 - 34 * ss, cy - 50 * ss, cx + total / 2 + 34 * ss, cy + 50 * ss)
+    d.rectangle((rb[0] + 10 * ss, rb[1] + 10 * ss, rb[2] + 10 * ss, rb[3] + 10 * ss), fill=(12, 8, 20, 255))
+    d.rectangle(rb, fill=(255, 216, 60, 255), outline=(12, 8, 20, 255), width=6 * ss)
+    tx = cx - total / 2
+    d.text((tx, cy - en.getbbox("C")[3] / 2 - 4 * ss), CLUB_NAME[0], font=en, fill=(110, 25, 160, 255))
+    zb = zh.getbbox(CLUB_NAME[1])
+    d.text((tx + ew + gap, cy - (zb[3] + zb[1]) / 2), CLUB_NAME[1], font=zh, fill=(18, 10, 24, 255))
+    im = im.rotate(2.5, resample=Image.BICUBIC, center=(cx, cy))
+    layers["ribbon"] = done(im)
+    layers["ribbon_c"] = (cx / ss, cy / ss)
+
+    # Info rows: dark chip label + text.
+    chip_f = _font("NotoSansTC.ttf", 36 * ss, 900)
+    row_f = _font("NotoSansTC.ttf", 46 * ss, 800)
+    chip_cols = [(110, 25, 160, 255), (30, 90, 200, 255), (40, 140, 90, 255)]
+    rows = []
+    for i, ((label, text), col) in enumerate(zip(INFO_LINES, chip_cols)):
+        im, d = canvas()
+        ry = y0 + (92 + i * 86) * ss
+        lx = x0 + 44 * ss
+        lw = d.textlength(label, font=chip_f)
+        d.rounded_rectangle((lx, ry - 30 * ss, lx + lw + 30 * ss, ry + 30 * ss), 10 * ss, fill=col)
+        cb = chip_f.getbbox(label)
+        d.text((lx + 15 * ss, ry - (cb[3] + cb[1]) / 2), label, font=chip_f, fill=(255, 255, 255, 255))
+        rb_ = row_f.getbbox(text)
+        d.text((lx + lw + 54 * ss, ry - (rb_[3] + rb_[1]) / 2), text, font=row_f, fill=(22, 14, 30, 255))
+        rows.append((done(im), (x0 / ss + 300, ry / ss)))
+    layers["rows"] = rows
+
+    # Divider + call to action.
+    im, d = canvas()
+    dy = y0 + 342 * ss
+    for k in range(0, int(x1 - x0 - 88 * ss), 22 * ss):
+        d.line((x0 + 44 * ss + k, dy, x0 + 44 * ss + k + 12 * ss, dy), fill=(12, 8, 20, 120), width=3 * ss)
+    call_f = _font("NotoSansTC.ttf", 46 * ss, 900)
+    cw = d.textlength(INFO_CALL, font=call_f)
+    cb = call_f.getbbox(INFO_CALL)
+    d.text(((x0 + x1) / 2 - cw / 2, dy + 56 * ss - (cb[3] + cb[1]) / 2), INFO_CALL, font=call_f, fill=(110, 25, 160, 255))
+    layers["call"] = (done(im), ((x0 + x1) / 2 / ss, (dy + 56 * ss) / ss))
+
+    # Prize line: plain lead/tail text, plus four big bouncing characters.
+    pre, prize, post = INFO_PRIZE
+    small = _font("NotoSansTC.ttf", 44 * ss, 900)
+    big = _font("NotoSansTC.ttf", 66 * ss, 900)
+    char_w = 76 * ss
+    pw, qw = d.textlength(pre, font=small), d.textlength(post, font=small)
+    total = pw + 16 * ss + char_w * len(prize) + 16 * ss + qw
+    py = dy + 136 * ss
+    px = (x0 + x1) / 2 - total / 2
+    im, d = canvas()
+    sb = small.getbbox(pre)
+    d.text((px, py - (sb[3] + sb[1]) / 2), pre, font=small, fill=(22, 14, 30, 255))
+    d.text((px + pw + 32 * ss + char_w * len(prize), py - (sb[3] + sb[1]) / 2), post, font=small, fill=(22, 14, 30, 255))
+    layers["prize_line"] = (done(im), ((x0 + x1) / 2 / ss, py / ss))
+    chars = []
+    for i, ch in enumerate(prize):
+        im, d = canvas()
+        ccx = px + pw + 16 * ss + char_w * (i + 0.5)
+        bw = d.textlength(ch, font=big)
+        bb = big.getbbox(ch)
+        d.text((ccx - bw / 2, py - (bb[3] + bb[1]) / 2), ch, font=big, fill=(255, 216, 60, 255),
+               stroke_width=7 * ss, stroke_fill=(12, 8, 20, 255))
+        chars.append((done(im), (ccx / ss, py / ss)))
+    layers["prize_chars"] = chars
+    return layers
+
+
+def overlays(canvas, t):
+    """Role name tags and the info card, drawn above the grade like the balloons."""
+    for s, e, arr, c in A.tags:
+        if s <= t <= e:
+            k = (t - s) / 0.12
+            scale = lerp(1.5, 1.0, ease_out(k, 3)) if k < 1 else 1.0
+            pop(arr, c, scale, min(1.0, k * 1.5) * min(1.0, (e - t) / 0.15), canvas)
+    if t < INFO_AT + 0.1:
+        return canvas
+    L = A.info
+    bc = ((INFO_BOX[0] + INFO_BOX[2]) / 2, (INFO_BOX[1] + INFO_BOX[3]) / 2)
+
+    def springy(t0, dur=0.22, start=0.3, over=1.08):
+        k = (t - t0) / dur
+        if k <= 0:
+            return None
+        if k < 1:
+            return lerp(start, over, ease_out(k, 3))
+        return lerp(over, 1.0, ease(min(1.0, (k - 1) * 1.5)))
+
+    sc = springy(INFO_AT + 0.15, 0.25, 0.2, 1.05)
+    if sc:
+        pop(L["body"], bc, sc, min(1.0, (t - INFO_AT - 0.15) / 0.1), canvas, rot=lerp(-6, 0, min(1, sc)))
+    sc = springy(INFO_AT + 0.35)
+    if sc:
+        pop(L["ribbon"], L["ribbon_c"], sc, 1.0, canvas)
+    for i, (arr, c) in enumerate(L["rows"]):
+        k = (t - INFO_AT - 0.5 - i * 0.18) / 0.2
+        if k > 0:
+            M = np.float32([[1, 0, lerp(-60, 0, ease_out(min(k, 1)))], [0, 1, 0]])
+            over(canvas, np.clip(cv2.warpAffine(arr, M, (W, H)), 0, 1), min(1.0, k))
+    k = (t - INFO_AT - 1.1) / 0.2
+    if k > 0:
+        arr, c = L["call"]
+        pop(arr, c, lerp(0.85, 1.0, ease_out(min(k, 1))), min(1.0, k), canvas)
+    k = (t - INFO_AT - 1.35) / 0.2
+    if k > 0:
+        arr, c = L["prize_line"]
+        over(canvas, arr, min(1.0, k))
+    for i, (arr, c) in enumerate(L["prize_chars"]):
+        t0 = INFO_AT + 1.5 + i * 0.14
+        sc = springy(t0, 0.16, 0.2, 1.3)
+        if sc:
+            # Keeps a gentle bounce after landing so the prize line stays lively.
+            bob = 0.04 * math.sin((t - t0) * 6 + i * 1.3) if t > t0 + 0.4 else 0.0
+            pop(arr, (c[0], c[1]), sc + bob, 1.0, canvas, rot=6 * math.sin((t - t0) * 3 + i))
+    return canvas
+
+
 def pop(arr, center, scale, alpha, canvas, rot=0.0):
     if alpha <= 0:
         return canvas
@@ -726,13 +928,20 @@ def s12_standoff(c, t, lt, u):
     top = np.zeros_like(c)
     bot = np.zeros_like(c)
     drift = ease(u) * 0.6
-    joker_bg(top, t, u, cx=420, cy=430, vh=760 - 30 * drift, rot=-3, sh=sh)
+    # When the info card arrives the two halves part to make room in the middle.
+    spread = ease((t - INFO_AT) / 0.5)
+    # Both keep moving (no hard freeze): the Trickster sways and bobs, the Hero breathes, cape stirs.
+    sway = 2.2 * math.sin(t * 1.4) + 0.8 * math.sin(t * 3.1)
+    bob = 9 * math.sin(t * 1.9)
+    breathe = 1 + 0.012 * math.sin(t * 1.2)
+    joker_bg(top, t, u, cx=420, cy=430 + 60 * spread, vh=760 - 30 * drift, rot=-3, sh=sh)
     put_char(top, A.char_layer("joker_4", JOKER_RIM, JOKER_GRADE),
-             (lerp(W * 0.1, W * 0.40, slam) + sh[0], H * 0.27 + sh[1]), 1150 + 40 * drift, -6, anchor=(0.45, 0.40))
-    hero_bg(bot, t, cx=1260, cy=430, vh=760 - 30 * drift, rot=-3, sh=sh)
-    lay = cape_wave(A.char_layer("batman_1", HERO_RIM, HERO_GRADE), t, 1.6, lambda x, y: batman_cape(x, y))
-    put_char(bot, lay, (lerp(W * 0.95, W * 0.60, slam) + sh[0], H * 0.76 + sh[1]), 1200 + 40 * drift, -4,
-             anchor=(0.5, 0.42))
+             (lerp(W * 0.1, W * 0.40, slam) + 60 * spread + sh[0], lerp(H * 0.27, 400, spread) + bob + sh[1]),
+             lerp(1150 + 40 * drift, 980, spread), -6 + sway, anchor=(0.45, 0.40))
+    hero_bg(bot, t, cx=1260, cy=430 - 40 * spread, vh=760 - 30 * drift, rot=-3, sh=sh)
+    lay = cape_wave(A.char_layer("batman_1", HERO_RIM, HERO_GRADE), t, 2.2, lambda x, y: batman_cape(x, y))
+    put_char(bot, lay, (lerp(W * 0.95, W * 0.60, slam) - 40 * spread + sh[0], lerp(H * 0.76, 1655, spread) + sh[1]),
+             lerp(1200 + 40 * drift, 1000, spread) * breathe, -4 + 0.6 * math.sin(t * 0.9), anchor=(0.5, 0.42))
     m = smoothstep(-2, 2, yy - seam_y)[..., None]
     c[:] = top * (1 - m) + bot * m
     # Light clash along the seam: purple/green from above meets blue from below.
@@ -762,6 +971,14 @@ def s12_standoff(c, t, lt, u):
     return out
 
 
+def s13_info(c, t, lt, u):
+    # Same standoff, continued: the halves part and the meeting card lands in the middle.
+    s0 = 16.75
+    out = s12_standoff(c, t, t - s0, (t - s0) / (DURATION - s0))
+    fade = ease((t - (DURATION - 0.25)) / 0.25)
+    return out * (1 - fade)
+
+
 SHOT_FUNCS = {name: globals()[name] for _, _, name in SHOTS}
 
 
@@ -769,4 +986,7 @@ def render_frame(t):
     frame, _ = shot_frame(t)
     # Lettering sits on top of the grade so halftone/grain never touch the text.
     frame = lettering(np.ascontiguousarray(frame, dtype=np.float32), t)
+    frame = overlays(frame, t)
+    if t > DURATION - 0.25:
+        frame *= 1 - ease((t - (DURATION - 0.25)) / 0.25)
     return (np.clip(frame, 0, 1) * 255 + 0.5).astype(np.uint8)
