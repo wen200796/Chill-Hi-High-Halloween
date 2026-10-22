@@ -1,11 +1,12 @@
 """Storyboard sheet for the Harry x Dumbledore piece, built from real rendered frames.
 
-Output: 哈鄧/output/storyboard/storyboard_v1.png and frames_v1/*.png
+Output: 哈鄧/output/storyboard/storyboard_v2.png and frames_v2/*.png
 """
 import re
 
 from PIL import Image, ImageDraw, ImageFont
 
+import info_card
 import magic_text
 import scene
 
@@ -34,9 +35,12 @@ BOARD = [
      "長廊縱深構圖：哈利在左前、鄧不利多在右後，中央是地面星形紋；鏡頭緩慢拉遠；綠色與藍銀能量從魔杖往中央延伸。",
      "定音鼓滾奏漸強、弦樂顫音、能量嗡鳴、riser"),
     ("S6a", 17.18, "17.10 光芒", "同上",
-     "兩股能量幾乎相觸，一道短暫光芒照亮兩人輪廓。", "低沉魔法衝擊＋鐘聲＋殘響（全片唯一的撞擊）"),
-    ("S6b", 22.00, "17.10–25.00 對峙停留 7.9 秒", "同上",
-     "比照小丑版的停留秒數。兩人持續呼吸、長袍擺動；能量停在即將碰撞處閃爍；粒子飄浮，極緩推進；最後 0.25 秒淡出。",
+     "兩股能量幾乎相觸，一道短暫光芒照亮兩人輪廓；之後兩人持續對峙，不硬定格。", "低沉魔法衝擊＋鐘聲＋殘響（全片唯一的撞擊）"),
+    ("S6b", 18.75, "17.75–19.40 資訊卡登場", "同上（雙方持續動態）",
+     "比照小丑版：鏡頭輕微拉遠、大廳下沉，空出穹頂；羊皮紙資訊卡浮現（深褐墨線、暗金框、皮革褐橫幅，單色不繽紛），社團橫幅貼上，日期／地點／交通由金色火花逐行寫入，接著變裝號召，「神秘小禮」四個古金色字以柔和暖光逐一點亮彈出。",
+     "卡片浮現的魔法閃光音；四個字各一聲鋼片琴音"),
+    ("S6c", 22.20, "19.40–25.00 資訊停留", "同上",
+     "內容到齊後完整停留約 5.4 秒（同小丑版）；兩人持續呼吸、長袍擺動，能量在中央閃爍；22.0 秒「神秘小禮」再彈跳一次；最後 0.25 秒淡出。",
      "鋼片琴主題配弦樂重現，收在小調和弦，殘響在 25 秒前收完"),
 ]
 
@@ -65,18 +69,18 @@ def wrap(d, text, f, maxw):
 
 
 def main():
-    (OUT / "frames_v1").mkdir(parents=True, exist_ok=True)
+    (OUT / "frames_v2").mkdir(parents=True, exist_ok=True)
     zh = "LXGWWenKaiTC-Bold.ttf"
-    boxes = magic_text.text_bboxes()
+    boxes = magic_text.text_bboxes() + info_card.bboxes()
     sb = scene.SAFE_BOX
     inside = sum(1 for _, b in boxes if b[0] >= sb[0] and b[1] >= sb[1] and b[2] <= sb[2] and b[3] <= sb[3])
     cols, tw, th, gap, text_h, head = 5, 280, 498, 24, 290, 250
     rows = (len(BOARD) + cols - 1) // cols
     sheet = Image.new("RGB", (cols * tw + (cols + 1) * gap, head + rows * (th + text_h + gap) + gap), (12, 14, 20))
     d = ImageDraw.Draw(sheet)
-    d.text((gap, 22), "史萊哲林哈利 × 鄧不利多｜分鏡 v1（9:16・1080×1920・24fps・25.0 秒）", font=font(zh, 36),
+    d.text((gap, 22), "史萊哲林哈利 × 鄧不利多｜分鏡 v2・加結尾資訊卡（9:16・1080×1920・24fps・25.0 秒）", font=font(zh, 36),
            fill=(235, 240, 235))
-    d.text((gap, 72), f"每格都是渲染器輸出的實際畫面（紅框＝文字安全框，台詞字元 {inside}/{len(boxes)} 在框內）。"
+    d.text((gap, 72), f"每格都是渲染器輸出的實際畫面（紅框＝文字安全框，文字元素 {inside}/{len(boxes)} 在框內）。"
                       "音樂和音效等分鏡確認後再製作。", font=font(zh, 21), fill=(170, 185, 180))
     # Timeline bar
     x0, x1, y = gap, sheet.width - gap, 120
@@ -90,12 +94,13 @@ def main():
         d.rectangle([x0 + s * sx, y, x0 + e * sx - 2, y + 36], fill=col)
     for ln in scene.LINES:
         d.rectangle([x0 + ln[2] * sx, y + 44, x0 + ln[3] * sx, y + 62], fill=(230, 210, 120))
+    d.rectangle([x0 + scene.INFO_AT * sx, y + 44, x0 + scene.DURATION * sx, y + 62], fill=(190, 150, 70))
     for t in range(0, 26, 5):
         d.text((x0 + t * sx - 6, y + 68), f"{t}s", font=font(zh, 17), fill=(150, 160, 160))
-    d.text((x0, y + 92), "綠＝哈利　藍＝鄧不利多　灰＝對峙　黃條＝台詞點亮區間", font=font(zh, 17), fill=(150, 160, 160))
+    d.text((x0, y + 92), "綠＝哈利　藍＝鄧不利多　灰＝對峙　黃條＝台詞點亮　金條＝例會資訊卡", font=font(zh, 17), fill=(150, 160, 160))
     for i, (sid, t, title, pic, action, audio) in enumerate(BOARD):
         im = Image.fromarray(scene.render_frame(t))
-        im.resize((540, 960), Image.LANCZOS).save(OUT / "frames_v1" / f"{sid}.png")
+        im.resize((540, 960), Image.LANCZOS).save(OUT / "frames_v2" / f"{sid}.png")
         dd = ImageDraw.Draw(im)
         dd.rectangle(sb, outline=(255, 50, 50), width=4)
         cx = gap + (i % cols) * (tw + gap)
@@ -114,8 +119,8 @@ def main():
         for line in wrap(d, action, font(zh, 16), tw) + [""] + wrap(d, "聲音：" + audio, font(zh, 16), tw):
             d.text((cx, yy), line, font=font(zh, 16), fill=(215, 218, 215))
             yy += 22
-    sheet.save(OUT / "storyboard_v1.png")
-    print("saved", OUT / "storyboard_v1.png", sheet.size, f"text units inside safe area: {inside}/{len(boxes)}")
+    sheet.save(OUT / "storyboard_v2.png")
+    print("saved", OUT / "storyboard_v2.png", sheet.size, f"text units inside safe area: {inside}/{len(boxes)}")
 
 
 if __name__ == "__main__":

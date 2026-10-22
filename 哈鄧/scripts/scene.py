@@ -57,6 +57,7 @@ SHOTS = [
     (17.10, DURATION, "s6_hold"),
 ]
 FLASH_AT = 17.10  # energies meet; from here the frame holds 7.9 s, same as the trickster/hero ending
+INFO_AT = 17.75   # meeting-info card starts (same offset after the impact as the trickster/hero card)
 
 FULL_BODY = {"harry_1", "dumbledore_1"}
 
@@ -502,8 +503,11 @@ def s5_standoff(c, t, lt, u):
 
 def s6_hold(c, t, lt, u):
     # Flash as the energies almost touch, then a 7.9 s held standoff with idle motion (no hard freeze).
-    k = ease(lt / (DURATION - FLASH_AT))
-    view = (270, lerp(470.5, 500, k), lerp(941, 900, k))
+    # When the info card arrives the camera eases back a touch and the hall sinks, opening the
+    # vaulted ceiling for the card while both heads and the meeting point stay clear below it.
+    room = ease((t - INFO_AT) / 0.5)
+    vh = lerp(941, 1000, room) - 15 * ease((t - INFO_AT - 0.5) / (DURATION - INFO_AT - 0.5))
+    view = (270, 941 - vh / 2, vh)
     standoff(c, t, view, 0.92 + 0.08 * ease(lt / 0.4), max(0.0, 1 - lt / 0.5))
     fade = ease((t - (DURATION - 0.25)) / 0.25)
     return finish(c, t, grade=((0.95, 1.0, 1.04), (0, 0.004, 0.01)), flash=0.6 * max(0, 1 - lt / 0.12), fade=fade)
@@ -527,6 +531,8 @@ def render_frame(t, lettering=True):
     if lettering:
         import magic_text
         frame = magic_text.draw(frame, t)
+        import info_card
+        frame = info_card.draw(frame, t)
         if t > DURATION - 0.25:
             frame *= 1 - ease((t - (DURATION - 0.25)) / 0.25)
     return (np.clip(frame, 0, 1) * 255 + 0.5).astype(np.uint8)
