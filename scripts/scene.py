@@ -35,6 +35,21 @@ SUBS = [
     (HERO_VO_AT + 2.38, HERO_VO_AT + 4.70, "And your potential.", "也看見了你的潛力。"),
 ]
 
+# "balloon" = comic speech balloons (Trickster above, Hero below, echoing the final
+# split screen) plus one sound-effect word on the impact; "subtitle" = plain subtitles.
+LETTERING = "balloon"
+# Per line in SUBS: (style, balloon center, balloon size, tail tip). Placed off faces,
+# the helmet and the chest emblem.
+BALLOONS = [
+    ("trickster", (390, 270), (720, 320), (690, 560)),
+    ("trickster", (385, 265), (730, 320), (700, 520)),
+    ("hero", (540, 1610), (820, 250), (560, 1370)),
+    ("hero", (520, 1620), (800, 250), (660, 1380)),
+]
+SFX_WORD = "KRAK!"
+# In balloon mode the dialogue close-ups sit a little lower to leave headroom.
+JOKER_DROP = 190 if LETTERING == "balloon" else 0
+
 # Shot list: (start, end, name). Cuts land on voice boundaries.
 SHOTS = [
     (0.00, 0.90, "s01_city"),
@@ -226,6 +241,9 @@ class Assets:
             arr = np.asarray(img).astype(np.float32) / 255
             arr[..., :3] *= arr[..., 3:4]
             self.subs.append((s, e, arr))
+        self.balloons = [(s, e, style, make_balloon(style, c, size, tip, en_t, zh_t))
+                         for (s, e, en_t, zh_t), (style, c, size, tip) in zip(SUBS, BALLOONS)]
+        self.sfx_word = make_sfx_word(SFX_WORD)
 
 
 A = None
@@ -389,6 +407,138 @@ def finish(canvas, t, sat=1.0, contrast=1.06, halftone_col=(0.05, 0.02, 0.10), g
     return np.clip(canvas, 0, 1)
 
 
+def _font(name, size, weight=None):
+    f = ImageFont.truetype(str(FONT_DIR / name), size)
+    if weight:
+        f.set_variation_by_axes([weight])
+    return f
+
+
+def make_balloon(style, center, size, tip, en_t, zh_t, ss=2):
+    """Full-frame premultiplied RGBA of one speech balloon (drawn at 2x, then reduced)."""
+    cw, ch = W * ss, H * ss
+    cx, cy = center[0] * ss, center[1] * ss
+    bw, bh = size[0] * ss / 2, size[1] * ss / 2
+    tx, ty = tip[0] * ss, tip[1] * ss
+    body = np.zeros((ch, cw), np.uint8)
+    if style == "trickster":
+        # Wobbly superellipse: playful, slightly unstable.
+        pts = []
+        for i in range(120):
+            a = i / 120 * 2 * np.pi
+            ca, sa = np.cos(a), np.sin(a)
+            r = 1 + 0.035 * np.sin(5 * a + 0.7) + 0.02 * np.sin(11 * a)
+            pts.append((cx + bw * r * np.sign(ca) * abs(ca) ** 0.6, cy + bh * r * np.sign(sa) * abs(sa) ** 0.6))
+        cv2.fillPoly(body, [np.int32(pts)], 255, cv2.LINE_AA)
+        # Curved tail.
+        d = np.array([tx - cx, ty - cy], np.float32)
+        d /= np.linalg.norm(d)
+        nrm = np.array([-d[1], d[0]])
+        base = np.array([cx, cy]) + d * np.array([bw, bh]) * 0.55
+        tail = [base + nrm * 42 * ss, base + nrm * 10 * ss + d * 30 * ss, (tx, ty), base - nrm * 34 * ss]
+        cv2.fillPoly(body, [np.int32(tail)], 255, cv2.LINE_AA)
+        fill, ink, shadow = (1.0, 1.0, 1.0), (0.08, 0.03, 0.12), PURPLE
+        shadow_off, stroke = (14 * ss, 12 * ss), 6 * ss
+        en_col, zh_col = (25, 10, 35), (110, 20, 150)
+        inner_glow = GREEN
+    else:
+        # Hard-edged chamfered box: calm, armored.
+        k = 22 * ss
+        x0, y0, x1, y1 = cx - bw, cy - bh, cx + bw, cy + bh
+        box = [(x0 + k, y0), (x1 - k, y0), (x1, y0 + k), (x1, y1 - k), (x1 - k, y1), (x0 + k, y1), (x0, y1 - k), (x0, y0 + k)]
+        cv2.fillPoly(body, [np.int32(box)], 255, cv2.LINE_AA)
+        bx = min(max(tx, x0 + 80 * ss), x1 - 80 * ss)
+        tail = [(bx - 34 * ss, y0 + 4), (tx, ty), (bx + 6 * ss, y0 + 4)]
+        cv2.fillPoly(body, [np.int32(tail)], 255, cv2.LINE_AA)
+        fill, ink, shadow = (0.03, 0.06, 0.13), (0.55, 0.78, 1.0), (0.0, 0.0, 0.0)
+        shadow_off, stroke = (10 * ss, 10 * ss), 4 * ss
+        en_col, zh_col = (255, 255, 255), (170, 210, 255)
+        inner_glow = None
+    m = body.astype(np.float32) / 255
+    outline = cv2.dilate(body, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * stroke + 1,) * 2)).astype(np.float32) / 255
+    if style == "hero":
+        # Thin cold-blue rule inside a black border.
+        outer = cv2.dilate(body, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * stroke + 9,) * 2)).astype(np.float32) / 255
+    else:
+        outer = outline
+    sh = np.roll(np.roll(outer, shadow_off[1], 0), shadow_off[0], 1)
+    rgb = np.zeros((ch, cw, 3), np.float32)
+    a = np.zeros((ch, cw), np.float32)
+    shadow_a = 0.85 if style == "trickster" else 0.55
+    rgb += sh[..., None] * np.array(shadow, np.float32) * shadow_a
+    a = np.maximum(a, sh * shadow_a)
+    if style == "hero":
+        rgb = rgb * (1 - outer[..., None]) + outer[..., None] * np.array((0.0, 0.0, 0.0), np.float32)
+        a = np.maximum(a, outer)
+    rgb = rgb * (1 - outline[..., None]) + outline[..., None] * np.array(ink, np.float32)
+    a = np.maximum(a, outline)
+    rgb = rgb * (1 - m[..., None]) + m[..., None] * np.array(fill, np.float32)
+    if inner_glow is not None:
+        # Faint green tint along the inside edge.
+        edge = np.clip(m - cv2.erode(body, np.ones((18 * ss, 18 * ss), np.uint8)).astype(np.float32) / 255, 0, 1)
+        edge = cv2.GaussianBlur(edge, (0, 0), 6 * ss) * m
+        rgb = rgb * (1 - 0.35 * edge[..., None]) + 0.35 * edge[..., None] * np.array(inner_glow, np.float32)
+    a = np.maximum(a, m) if style == "trickster" else np.maximum(a, m * 0.93)
+    img = Image.fromarray((np.dstack([rgb, a]) * 255).astype(np.uint8), "RGBA")
+    d = ImageDraw.Draw(img)
+    en = _font("Bangers-Regular.ttf", 72 * ss)
+    zh = _font("NotoSansTC.ttf", 52 * ss, 900)
+    tilt = -0.0
+    gap = 14 * ss
+    eh = en.getbbox(en_t)[3] - en.getbbox(en_t)[1]
+    zhh = zh.getbbox(zh_t)[3] - zh.getbbox(zh_t)[1]
+    top = cy - (eh + gap + zhh) / 2 - (6 * ss if style == "trickster" else 2 * ss)
+    for text, font, y, col in ((en_t, en, top - en.getbbox(en_t)[1], en_col),
+                               (zh_t, zh, top + eh + gap - zh.getbbox(zh_t)[1], zh_col)):
+        w_ = d.textlength(text, font=font)
+        d.text((cx - w_ / 2, y), text, font=font, fill=col + (255,))
+    img = img.resize((W, H), Image.LANCZOS)
+    arr = np.asarray(img).astype(np.float32) / 255
+    arr[..., :3] *= arr[..., 3:4]
+    return {"rgba": arr, "center": center, "style": style, "tilt": tilt}
+
+
+def make_sfx_word(word):
+    """Comic sound-effect lettering, full frame, centered."""
+    img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    f = _font("Bangers-Regular.ttf", 250)
+    w_ = d.textlength(word, font=f)
+    x, y = W / 2 - w_ / 2, H / 2 - 160
+    d.text((x + 16, y + 16), word, font=f, fill=(110, 30, 170, 255), stroke_width=16, stroke_fill=(110, 30, 170, 255))
+    d.text((x, y), word, font=f, fill=(255, 222, 60, 255), stroke_width=16, stroke_fill=(12, 8, 20, 255))
+    img = img.rotate(-9, resample=Image.BICUBIC, center=(W / 2, H / 2))
+    arr = np.asarray(img).astype(np.float32) / 255
+    arr[..., :3] *= arr[..., 3:4]
+    return arr
+
+
+def pop(arr, center, scale, alpha, canvas, rot=0.0):
+    if alpha <= 0:
+        return canvas
+    M = affine((W, H), (center[0] / W, center[1] / H), center, scale, rot)
+    return over(canvas, np.clip(warp(arr, M), 0, 1), alpha)
+
+
+def lettering(canvas, t):
+    if LETTERING != "balloon":
+        return subtitles(canvas, t)
+    for s, e, style, b in A.balloons:
+        if s - 0.001 <= t <= e:
+            k = (t - s) / 0.16
+            if style == "trickster":
+                # Springy pop with a little wobble.
+                scale = 1.0 + (0.18 * math.sin(min(k, 1) * math.pi * 1.5) * (1 - min(k, 1)) if k < 1 else 0) - 0.25 * max(0, 1 - k * 2)
+                rot = 2.0 * math.sin(t * 5.0)
+            else:
+                # Firm, quick settle.
+                scale = 1.0 - 0.06 * max(0.0, 1 - k)
+                rot = 0.0
+            out = min(1.0, (e - t) / 0.1)
+            pop(b["rgba"], b["center"], scale, min(1.0, k * 2) * out, canvas, rot)
+    return canvas
+
+
 def subtitles(canvas, t, y=1500):
     for s, e, arr in A.subs:
         if s - 0.001 <= t <= e:
@@ -474,9 +624,8 @@ def s04_why_so_serious(c, t, lt, u):
     joker_bg(c, t, u, cx=lerp(300, 340, u), cy=400, vh=700, rot=2)
     glow(c, (W * 0.25, H * 0.25), 380, PURPLE, 0.35)
     # Mock-thoughtful glance: slow push with a small head tilt toward the camera.
-    put_char(c, A.char_layer("joker_2", JOKER_RIM, JOKER_GRADE), (W * 0.47, H * 0.45),
+    put_char(c, A.char_layer("joker_2", JOKER_RIM, JOKER_GRADE), (W * 0.47, H * 0.45 + JOKER_DROP),
              lerp(1640, 1800, ease(u)), lerp(2.5, -2.0, ease(u)), anchor=(0.5, 0.42))
-    subtitles(c, t)
     return finish(c, t)
 
 
@@ -489,10 +638,9 @@ def s05_have_some_fun(c, t, lt, u):
     glow(c, (W * 0.3, H * 0.55), 520, GREEN, 0.22)
     height = lerp(1500, 1620, ease(u)) + 260 * punch
     put_char(c, A.char_layer("joker_4", JOKER_RIM, JOKER_GRADE),
-             (W * 0.52 + sh[0], H * 0.46 + sh[1]), height, lerp(-1.5, 2.0, ease(u)), anchor=(0.45, 0.42))
+             (W * 0.52 + sh[0], H * 0.46 + sh[1] + JOKER_DROP * 0.8), height, lerp(-1.5, 2.0, ease(u)), anchor=(0.45, 0.42))
     if punch > 0:
         speed_lines(c, t, (W * 0.30, H * 0.52), (0.85, 1.0, 0.8), 0.55 * (1 - punch * 0.7), r_in=360, seed=4)
-    subtitles(c, t)
     out = finish(c, t)
     stinger = JOKER_VO_AT + 5.25
     g = 1.0 - abs(t - stinger) / 0.12 if abs(t - stinger) < 0.12 else 0.0
@@ -535,7 +683,6 @@ def s08_weakness(c, t, lt, u):
              anchor=(0.5, 0.48))
     ex = [(W * 0.5 + (0.355 - 0.5) * hgt, cy + (0.31 - 0.48) * hgt), (W * 0.5 + (0.62 - 0.5) * hgt, cy + (0.31 - 0.48) * hgt)]
     eye_glint(c, ex, 0.55 * ease((lt - 0.9) / 0.3))
-    subtitles(c, t)
     return finish(c, t, sat=0.9, halftone_col=(0.0, 0.02, 0.08))
 
 
@@ -545,7 +692,6 @@ def s09_potential(c, t, lt, u):
     lay = cape_wave(A.char_layer("batman_4", HERO_RIM, HERO_GRADE), t, 2.0,
                     lambda x, y: batman_cape(x, y, center=0.75, inner=0.2) * smoothstep(0.35, 0.7, x))
     put_char(c, lay, (W * 0.55, H * 0.46), lerp(1650, 1820, ease(u)), 0, anchor=(0.55, 0.45))
-    subtitles(c, t)
     return finish(c, t, sat=0.9, halftone_col=(0.0, 0.02, 0.08))
 
 
@@ -606,6 +752,11 @@ def s12_standoff(c, t, lt, u):
         starburst(c, (W / 2 + sh[0], H / 2 + sh[1]), r, [(1, 1, 1), (0.85, 0.95, 1.0), (1, 0.95, 0.6)], burst_a,
                   rot=0.2)
         speed_lines(c, t, (W / 2, H / 2), (1, 1, 1), 0.6 * burst_a, r_in=320, seed=2)
+    if LETTERING == "balloon" and IMPACT_AT <= t < IMPACT_AT + 0.75:
+        k = (t - IMPACT_AT) / 0.14
+        scale = lerp(0.4, 1.12, ease_out(k)) if k < 1 else lerp(1.12, 1.0, ease((k - 1) / 0.8))
+        fade = 1 - ease((t - IMPACT_AT - 0.5) / 0.25)
+        pop(A.sfx_word, (W / 2 + sh[0], H / 2 + sh[1]), scale, fade, c)
     flash = 0.7 * max(0, 1 - abs(t - IMPACT_AT) / 0.06) if t >= IMPACT_AT - 0.01 else 0
     out = finish(c, t, halftone_col=(0.02, 0.0, 0.06), flash=flash)
     return out
@@ -616,4 +767,6 @@ SHOT_FUNCS = {name: globals()[name] for _, _, name in SHOTS}
 
 def render_frame(t):
     frame, _ = shot_frame(t)
+    # Lettering sits on top of the grade so halftone/grain never touch the text.
+    frame = lettering(np.ascontiguousarray(frame, dtype=np.float32), t)
     return (np.clip(frame, 0, 1) * 255 + 0.5).astype(np.uint8)
