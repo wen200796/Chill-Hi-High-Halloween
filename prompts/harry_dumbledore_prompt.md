@@ -359,6 +359,7 @@
 九、最終交付
 
 輸出檔案
+（若專案已有這個主題的資料夾，例如 哈鄧/，請把以下路徑中的 output/ 換成該資料夾，沿用既有結構）
 * output/harry_dumbledore_preview.mp4
 * output/harry_dumbledore_final.mp4
 * output/harry_dumbledore_report.md
