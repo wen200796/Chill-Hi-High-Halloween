@@ -314,6 +314,7 @@ def sfx():
         f0 = midi(m)
         pop = np.sin(2 * np.pi * np.cumsum(f0 * (1 + 0.6 * np.exp(-t_axis(n) * 60))) / SR) * adsr(n, 0.002, 0.04)
         place(bus, pop, PRIZE_AT + i * 0.12, -0.45 + 0.3 * i, db(-24))
+        place(bus, pop, scene.PRIZE_REBOUNCE_AT + i * 0.1, -0.45 + 0.3 * i, db(-30))  # softer second bounce
     return bus
 
 

@@ -60,7 +60,7 @@ def main():
     # Key frames with the safe box drawn on.
     keys = [(1.6, "S02 名牌"), (4.0, "S04 對話框"), (6.4, "S05 對話框"),
             (8.4, "S06 名牌"), (11.0, "S08 對話框"), (13.6, "S09 對話框"),
-            (17.25, "S12 擬聲字"), (19.6, "S13 資訊卡到齊"), (22.6, "S13 停留尾段")]
+            (17.25, "S12 擬聲字"), (19.6, "S13 資訊卡到齊"), (22.15, "S13 再彈跳"), (24.6, "S13 停留尾段")]
     font_dir = scene.FONT_DIR
     zh = ImageFont.truetype(str(font_dir / "NotoSansTC.ttf"), 26)
     zh.set_variation_by_axes([800])

@@ -21,7 +21,7 @@ FONT_DIR = ROOT / "output/_build/fonts"
 
 W, H = 1080, 1920
 FPS = 30
-DURATION = 23.0
+DURATION = 25.0
 
 # Voice placement on the master timeline (seconds). Word timings were measured
 # with forced alignment on the original files; see the report.
@@ -64,6 +64,8 @@ INFO_LINES = [
 ]
 INFO_CALL = "歡迎大家一起變裝出場！"
 INFO_PRIZE = ("現場還有", "神秘小禮", "抽獎等你帶走！")
+# A second bounce of the prize characters keeps the long final hold alive.
+PRIZE_REBOUNCE_AT = DURATION - 3.0
 # In balloon mode the dialogue close-ups sit a little lower to leave headroom.
 JOKER_DROP = 230 if LETTERING == "balloon" else 0
 
@@ -713,6 +715,9 @@ def overlays(canvas, t):
         if sc:
             # Keeps a gentle bounce after landing so the prize line stays lively.
             bob = 0.04 * math.sin((t - t0) * 6 + i * 1.3) if t > t0 + 0.4 else 0.0
+            k2 = (t - PRIZE_REBOUNCE_AT - i * 0.1) / 0.25
+            if 0 < k2 < 1:
+                bob += 0.22 * math.sin(math.pi * k2)
             pop(arr, (c[0], c[1]), sc + bob, 1.0, canvas, rot=6 * math.sin((t - t0) * 3 + i))
     return canvas
 
